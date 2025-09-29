@@ -11,7 +11,7 @@ This esp32c3 code is based on the awesome [bluepad32 software][bluepad32-github]
 # Support
 
 ## antpad support
-you can ask about antpad in the italian robot combat [Discord][discord_bp32] [![discord](https://img.shields.io/discord/775177861665521725.svg)](https://discord.gg/zKuerqs6EP)
+you can ask about antpad in the italian robot combat [Discord][discord] [![discord](https://img.shields.io/discord/775177861665521725.svg)](https://discord.gg/zKuerqs6EP)
 
 
 ## bluepad32 support
