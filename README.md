@@ -4,6 +4,10 @@ A fimrware to use bluepad32 for antweight robots with esp32c3 microcontrollers, 
 Notice:
 Combat robots are inherently dangerous, always use one with the correct weapon locks and in an enclosed testbox, no robot or firmware is 100% safe, especilly through bluetooth connection, it's advised to use this code only for non dangerous sportsman robots, any use with destructive robots such as spinner is considered a misuse of the software and there is no guarateed that the software will prevent all misbehaviour.
 
+to uplaod the code install the bluepad32 boards on your arduino IDE, then navigate to source/antpad_arduino/ and open the antpad_arduino.ino file, remember to select board->esp32_bluepad32->"esp32c3 dev module" and enable usb CDC on boot in the tools tab on arduino IDE
+
+optionally run the espefuse commands to prevent the esp to move motors while on upload or reset state
+
 # Bluepad32
 
 This esp32c3 code is based on the awesome [bluepad32 software][bluepad32-github], please visit them to setup your arduino ide in order to upload the code 
