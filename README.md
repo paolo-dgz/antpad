@@ -8,13 +8,13 @@ Combat robots are inherently dangerous, always use one with the correct weapon l
 
 This esp32c3 code is based on the awesome [bluepad32 software][bluepad32-github], please visit them to setup your arduino ide in order to upload the code 
 
-## Support
+# Support
 
-# antpad support
+## antpad support
 you can ask about antpad in the italian robot combat [Discord][discord_bp32] [![discord](https://img.shields.io/discord/775177861665521725.svg)](https://discord.gg/zKuerqs6EP)
 
 
-# bluepad32 support
+## bluepad32 support
 * [Documentation][docs] [![Documentation Status](https://readthedocs.org/projects/bluepad32/badge/?version=latest)](https://bluepad32.readthedocs.io/?badge=latest)
 * [Discord][discord_bp32] [![discord](https://img.shields.io/discord/775177861665521725.svg)](https://discord.gg/r5aMn6Cw5q)
 
