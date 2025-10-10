@@ -66,6 +66,20 @@ const uint8_t ADDR_RMTCONFIG = ADDR_RMTCONFIG_VALID + sizeof(EEPROM_VALID_BYTE);
 const uint8_t ADDR_BOARDCONFIG_VALID = ADDR_RMTCONFIG + sizeof(RemoteConfig);
 const uint8_t ADDR_BOARDCONFIG = ADDR_BOARDCONFIG_VALID + sizeof(EEPROM_VALID_BYTE);
 
+bool cmd_up = false;
+bool cmd_down = false;
+bool cmd_enter = false;
+bool cmd_back = false;
+
+bool state_up = false;
+bool state_down = false;
+bool state_enter = false;
+bool state_back = false;
+
+bool state_up_pre = false;
+bool state_down_pre = false;
+bool state_enter_pre = false;
+bool state_back_pre = false;
 
 // This callback gets called any time a new gamepad is connected.
 // Up to 4 gamepads can be connected at the same time.
@@ -98,7 +112,9 @@ void onConnectedController(ControllerPtr ctl) {
     BP32.enableNewBluetoothConnections(false);
     Serial.println("VALID => LOCKED");
   } else {
+    Serial.println("WRONG => DSCONNECT");
     ctl->disconnect();
+    ;
   }
 }
 
@@ -175,8 +191,8 @@ void processController() {
     int ch4 = RemoteController->axisRX();
   }
 
-  ch3 = ch3*RemoteConfig.ch3_reverse;
-  ch4 = ch4*RemoteConfig.ch4_reverse;
+  ch3 = ch3 * RemoteConfig.ch3_reverse;
+  ch4 = ch4 * RemoteConfig.ch4_reverse;
 
 
   //setups
@@ -219,7 +235,7 @@ void processController() {
   if (RemoteConfig.ch3_bdir) {
     servoAAngle = map(ch3, -508, 508, BoardConfig.servo_a_min, BoardConfig.servo_a_max);
   } else {
-    servoAAngle = map(ch3, 0, 508, BoardConfig.servo_a_max,BoardConfig.servo_a_min);
+    servoAAngle = map(ch3, 0, 508, BoardConfig.servo_a_max, BoardConfig.servo_a_min);
   }
 
   servoBAngle = map(ch4, -508, 508, 0, 1023);
@@ -227,18 +243,46 @@ void processController() {
   motWSpeed = map(ch4, -508, 508, -512, 512);
 
 
-  //sets
+  //cmds
+  cmd_up = false;
+  cmd_down = false;
+  cmd_enter = false;
+  cmd_back = false;
+
+  state_up = RemoteController->dpad() & 0b1;
+  state_down = RemoteController->dpad() & 0b10;
+  state_enter = RemoteController->a();
+  state_back = RemoteController->b();
+
+  if (!state_up && state_up_pre) {
+    cmd_up = true;
+  }
+
+  if (!state_down && state_down_pre) {
+    cmd_down = true;
+  }
+
+  if (!state_enter && state_enter_pre) {
+    cmd_enter = true;
+  }
+
+  if (!state_back && state_back_pre) {
+    cmd_back = true;
+  }
+
+  state_up_pre = state_up;
+  state_down_pre = state_down;
+  state_enter_pre = state_enter;
+  state_back_pre = state_back;
 
 
 
 
   /*
-  Serial.print("th ");
-  Serial.print(leftThrottle);
-  Serial.print(" ");
-  Serial.print(rightThrottle);
-  Serial.print(" ");
-  Serial.println(ch3);
+  Serial.print(cmd_up);
+  Serial.print(cmd_down);
+  Serial.print(cmd_enter);
+  Serial.println(cmd_back);
   //*/
 }
 
@@ -256,6 +300,10 @@ void processBoard() {
   Serial.println(servoBAngle);
   //*/
   if (failsafe) {
+    cmd_up = false;
+    cmd_down = false;
+    cmd_enter = false;
+    cmd_back = false;
     motRSpeed = 0;
     motLSpeed = 0;
     motWSpeed = 0;
@@ -264,7 +312,7 @@ void processBoard() {
     RobotBoard.failsafe();
     return;
   }
-  
+
   RobotBoard.motLSetSpeed(motLSpeed * BoardConfig.motl_reverse);
   RobotBoard.motRSetSpeed(motRSpeed * BoardConfig.motr_reverse);
   RobotBoard.motWSetSpeed(motWSpeed * BoardConfig.motw_reverse);
@@ -282,7 +330,7 @@ void initEeprom() {
     MacEepromValid = true;
     binding = false;
     Serial.println("-> Loaded MAC");
-  }else{
+  } else {
     Serial.println("-> no MAC");
   }
   valid = EEPROM.readByte(ADDR_RMTCONFIG_VALID);
@@ -290,24 +338,24 @@ void initEeprom() {
     EEPROM.readBytes(ADDR_RMTCONFIG, &RemoteConfig, sizeof(RemoteConfig));
     CfgRemoteEepromValid = true;
     Serial.println("-> Loaded RMT");
-  }else{
+  } else {
     Serial.println("-> no RMT");
   }
   valid = EEPROM.readByte(ADDR_BOARDCONFIG_VALID);
   if (valid == EEPROM_VALID_BYTE) {
     EEPROM.readBytes(ADDR_BOARDCONFIG, &BoardConfig, sizeof(BoardConfig));
     Serial.println("-> Loaded BOARD");
-  }else{
+  } else {
     Serial.println("-> no BOARD");
   }
   Serial.println("EEPROM end");
 }
 
 
-void check_mode(){
+void check_mode() {
   unsigned long current_time = millis();
-  if(!connection_ok){
-    if (current_time > 60000  && binding == false) {
+  if (!connection_ok) {
+    if (current_time > 60000 && binding == false) {
       Serial.println("rebinding");
       MacEepromValid = false;
       binding = true;
@@ -320,26 +368,81 @@ void check_mode(){
       setting = true;
       return;
     }
-  }else{
+  } else {
     binding = false;
-    setting = false;
   }
 }
 
-void handle_blink(){
-  if(binding){
-    LedTask.setBlinks(2,500,10);
+
+
+int setting_mode = 0;
+
+void handle_blink() {
+  if (binding) {
+    LedTask.setBlinks(2, 500, 10);
     return;
   }
-  if(setting){
-    LedTask.setBlinks(1,-1,10);
+  if (setting) {
+    if (setting_mode == 0) {
+      LedTask.setBlinks(1, -1, 15);
+    } else {
+      LedTask.setBlinks(1, -1, 5);
+    }
     return;
   }
-  if(failsafe){
-    LedTask.setBlinks(1,-1,1);
+  if (failsafe) {
+    LedTask.setBlinks(1, -1, 1);
     return;
   }
   LedTask.ledOn();
+}
+
+
+void processCmd() {
+  if (!setting) {
+    return;
+  }
+
+  if (cmd_back) {
+    EEPROM.writeBytes(ADDR_BOARDCONFIG_VALID, &EEPROM_VALID_BYTE, sizeof(EEPROM_VALID_BYTE));
+    EEPROM.writeBytes(ADDR_BOARDCONFIG, &BoardConfig, sizeof(BoardConfig));
+    EEPROM.commit();
+    setting = false;
+  }
+
+  if (cmd_enter) {
+    setting_mode = (setting_mode + 1) % 2;
+  }
+
+  if (setting_mode == 1) {
+    int temp_angle = BoardConfig.servo_a_min;
+    if (cmd_up) {
+      temp_angle = temp_angle - 10;
+      constrain(temp_angle, 0, BoardConfig.servo_a_max - 20);
+      BoardConfig.servo_a_min = temp_angle;
+    }
+    if (cmd_down) {
+      temp_angle = temp_angle + 10;
+      constrain(temp_angle, 0, 1023);
+      BoardConfig.servo_a_min = temp_angle;
+    }
+  }
+  if (setting_mode == 0) {
+    int temp_angle = BoardConfig.servo_a_max;
+    if (cmd_up) {
+      temp_angle = temp_angle - 10;
+      constrain(temp_angle, BoardConfig.servo_a_min + 20, 1023);
+      BoardConfig.servo_a_max = temp_angle;
+    }
+    if (cmd_down) {
+      temp_angle = temp_angle + 10;
+      constrain(temp_angle, 0, 1023);
+      BoardConfig.servo_a_max = temp_angle;
+    }
+  }
+  Serial.print(BoardConfig.servo_a_min);
+  Serial.print("  ");
+  Serial.println(BoardConfig.servo_a_max);
 }
 
 
@@ -384,6 +487,7 @@ void loop() {
       processController();
     }
   }
+  processCmd();
   processBoard();
 
   // The main loop must have some kind of "yield to lower priority task" event.
@@ -396,5 +500,4 @@ void loop() {
   check_mode();
   handle_blink();
   delay(10);
-  
 }
