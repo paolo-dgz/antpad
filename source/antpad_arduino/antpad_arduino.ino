@@ -193,6 +193,12 @@ void processController() {
     ch3 = -RemoteController->axisRY();
     ch4 = RemoteController->axisRX();
   }
+  if(false){
+    ch1 = RemoteController->throttle() - RemoteController->brake();
+    ch2 = RemoteController->axisRX();
+  ch3 = -RemoteController->axisY();
+  ch4 = RemoteController->axisX();
+  }
 
   ch1 = ch1 * RemoteConfig.ch1_reverse;
   ch2 = ch2 * RemoteConfig.ch2_reverse;
