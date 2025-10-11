@@ -1,9 +1,11 @@
+bool factory_reset = false;
+
 struct remote_config_t {
   int8_t ch1_reverse = 1;
   int8_t ch2_reverse = 1;
-  int8_t ch3_reverse = -1;
+  int8_t ch3_reverse = 1;
   int8_t ch4_reverse = 1;
-  bool left_stick = false;
+  bool left_stick = true;
   bool ch3_bdir = false;
   bool tank_drive = false;
 };

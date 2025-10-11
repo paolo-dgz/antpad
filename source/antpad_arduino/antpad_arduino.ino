@@ -37,6 +37,8 @@ const byte CLEAR_BYTE = 0;
 
 
 //global vars
+int version = 1;
+
 bool MacEepromValid = false;
 bool CfgRemoteEepromValid = false;
 bool CfgBoardEepromValid = false;
@@ -178,44 +180,48 @@ void processController() {
 
 
 
-  int joystick_y = -RemoteController->axisRY();
-  int joystick_x = RemoteController->axisRX();
-  int ch3 = RemoteController->axisY();
+  int ch1 = -RemoteController->axisRY();
+  int ch2 = RemoteController->axisRX();
+  int ch3 = -RemoteController->axisY();
   int ch4 = RemoteController->axisX();
   bool ch3_full = RemoteController->l1();
+  bool ch3_rev = RemoteController->r1();
 
   if (RemoteConfig.left_stick) {
-    joystick_y = -RemoteController->axisY();
-    joystick_x = RemoteController->axisX();
-    int ch3 = RemoteController->axisRY();
-    int ch4 = RemoteController->axisRX();
+    ch1 = -RemoteController->axisY();
+    ch2 = RemoteController->axisX();
+    ch3 = -RemoteController->axisRY();
+    ch4 = RemoteController->axisRX();
   }
 
+  ch1 = ch1 * RemoteConfig.ch1_reverse;
+  ch2 = ch2 * RemoteConfig.ch2_reverse;
   ch3 = ch3 * RemoteConfig.ch3_reverse;
   ch4 = ch4 * RemoteConfig.ch4_reverse;
 
-
   //setups
-  joystick_y = constrain(joystick_y, -508, 508);
-  joystick_x = constrain(joystick_x, -508, 508);
+  ch1 = constrain(ch1, -508, 508);
+  ch2 = constrain(ch2, -508, 508);
 
+  if (ch3_rev) {
+    ch3 = -508;
+  }
+  if (ch3_full) {
+    ch3 = 508;
+  }
   if (RemoteConfig.ch3_bdir) {
     ch3 = constrain(ch3, -508, 508);
   } else {
     ch3 = constrain(ch3, 0, 508);
   }
-
-  if (ch3_full) {
-    ch3 = 508;
-  }
   ch4 = constrain(ch4, -508, 508);
 
-  int leftThrottle = joystick_y + joystick_x;
-  int rightThrottle = joystick_y - joystick_x;
+  int leftThrottle = ch1 + ch2;
+  int rightThrottle = ch1 - ch2;
 
   // in some cases the max is 100, in some cases it is 200
   // let's factor in the difference so the max is always 200
-  int diff = abs(abs(joystick_y) - abs(joystick_x));
+  int diff = abs(abs(ch1) - abs(ch2));
   leftThrottle = leftThrottle < 0 ? leftThrottle - diff : leftThrottle + diff;
   rightThrottle = rightThrottle < 0 ? rightThrottle - diff : rightThrottle + diff;
 
@@ -231,16 +237,32 @@ void processController() {
 
 
   //weaps
+  int temp_min = BoardConfig.servo_a_min;
+  int temp_max = BoardConfig.servo_a_max;
 
-  if (RemoteConfig.ch3_bdir) {
-    servoAAngle = map(ch3, -508, 508, BoardConfig.servo_a_min, BoardConfig.servo_a_max);
-  } else {
-    servoAAngle = map(ch3, 0, 508, BoardConfig.servo_a_max, BoardConfig.servo_a_min);
+  if(BoardConfig.servo_a_reverse){
+    temp_min = BoardConfig.servo_a_max;
+    temp_max = BoardConfig.servo_a_min;
   }
 
-  servoBAngle = map(ch4, -508, 508, 0, 1023);
+  if (RemoteConfig.ch3_bdir) {
+    servoAAngle = map(ch3, -508, 508, temp_min, temp_max);
+  } else {
+    servoAAngle = map(ch3, 0, 508, temp_min, temp_max);
+  }
+
+  temp_min = BoardConfig.servo_b_min;
+  temp_max = BoardConfig.servo_b_max;
+  if(BoardConfig.servo_a_reverse){
+    temp_min = BoardConfig.servo_b_max;
+    temp_max = BoardConfig.servo_b_min;
+  }
+
+  servoBAngle = map(ch4, -508, 508, temp_min, temp_max);
 
   motWSpeed = map(ch4, -508, 508, -512, 512);
+  motWSpeed = constrain(motWSpeed, -512, 512);
+
 
 
   //cmds
@@ -325,7 +347,7 @@ void initEeprom() {
   Serial.println("EEPROM start");
   EEPROM.begin(64);
   byte valid = EEPROM.readByte(ADDR_MAC_VALID);
-  if (valid == EEPROM_VALID_BYTE) {
+  if (valid == EEPROM_VALID_BYTE  && !factory_reset) {
     EEPROM.readBytes(ADDR_MAC, &ControllerAddress, sizeof(ControllerAddress));
     MacEepromValid = true;
     binding = false;
@@ -334,7 +356,7 @@ void initEeprom() {
     Serial.println("-> no MAC");
   }
   valid = EEPROM.readByte(ADDR_RMTCONFIG_VALID);
-  if (valid == EEPROM_VALID_BYTE) {
+  if (valid == EEPROM_VALID_BYTE && !factory_reset) {
     EEPROM.readBytes(ADDR_RMTCONFIG, &RemoteConfig, sizeof(RemoteConfig));
     CfgRemoteEepromValid = true;
     Serial.println("-> Loaded RMT");
@@ -342,7 +364,7 @@ void initEeprom() {
     Serial.println("-> no RMT");
   }
   valid = EEPROM.readByte(ADDR_BOARDCONFIG_VALID);
-  if (valid == EEPROM_VALID_BYTE) {
+  if (valid == EEPROM_VALID_BYTE && !factory_reset) {
     EEPROM.readBytes(ADDR_BOARDCONFIG, &BoardConfig, sizeof(BoardConfig));
     Serial.println("-> Loaded BOARD");
   } else {
@@ -417,28 +439,31 @@ void processCmd() {
   if (setting_mode == 1) {
     int temp_angle = BoardConfig.servo_a_min;
     if (cmd_up) {
-      temp_angle = temp_angle - 10;
-      constrain(temp_angle, 0, BoardConfig.servo_a_max - 20);
+      temp_angle = temp_angle + 10;
+      temp_angle = constrain(temp_angle, 0, BoardConfig.servo_a_max - 20);
       BoardConfig.servo_a_min = temp_angle;
     }
     if (cmd_down) {
-      temp_angle = temp_angle + 10;
-      constrain(temp_angle, 0, 1023);
+      temp_angle = temp_angle - 10;
+      temp_angle = constrain(temp_angle, 0, BoardConfig.servo_a_max - 20);
       BoardConfig.servo_a_min = temp_angle;
     }
+    servoAAngle = BoardConfig.servo_a_min;
   }
+
   if (setting_mode == 0) {
     int temp_angle = BoardConfig.servo_a_max;
     if (cmd_up) {
-      temp_angle = temp_angle - 10;
-      constrain(temp_angle, BoardConfig.servo_a_min + 20, 1023);
+      temp_angle = temp_angle + 10;
+      temp_angle = constrain(temp_angle, BoardConfig.servo_a_min + 20, 1023);
       BoardConfig.servo_a_max = temp_angle;
     }
     if (cmd_down) {
-      temp_angle = temp_angle + 10;
-      constrain(temp_angle, 0, 1023);
+      temp_angle = temp_angle - 10;
+      temp_angle = constrain(temp_angle, BoardConfig.servo_a_min + 20, 1023);
       BoardConfig.servo_a_max = temp_angle;
     }
+    servoAAngle = BoardConfig.servo_a_max;
   }
   Serial.print(BoardConfig.servo_a_min);
   Serial.print("  ");
@@ -450,6 +475,8 @@ void processCmd() {
 void setup() {
   Serial.begin(115200);
   Serial.printf("Firmware: %s\n", BP32.firmwareVersion());
+  Serial.print("Antpad version: ");
+  Serial.println(version);
   const uint8_t* addr = BP32.localBdAddress();
   Serial.printf("BD Addr: %2X:%2X:%2X:%2X:%2X:%2X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
 
