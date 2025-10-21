@@ -41,7 +41,7 @@ LedUtility LedTask = LedUtility(&RobotBoard);
 
 //global vars
 
-String AntpadVersion = "0.1.0";
+String AntpadVersion = "0.1.1";
 ControllerPtr RemoteController;
 unsigned long CurrentMs = 0;
 int ch_vals[7] = { 0, 0, 0, 0, 0, 0, 0 };
@@ -446,11 +446,11 @@ void processMenuState(MenuCmd cmd) {
     case MENU_SERVOS:
       disable_movements = false;
       switch (cmd) {
-        case CMD_DOWN:
+        case CMD_UP:
           Serial.println("Set servo 0");
           MenuCurrentServo = 0;
           break;
-        case CMD_UP:
+        case CMD_DOWN:
           Serial.println("Set servo 1");
           MenuCurrentServo = 1;
           break;
