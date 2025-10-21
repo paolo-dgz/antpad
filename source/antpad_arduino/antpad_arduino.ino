@@ -54,8 +54,8 @@ int motRSpeed = 0;
 int motLSpeed = 0;
 int motWSpeed = 0;
 
-int servoAAngle = 0;
-int servoBAngle = 0;
+int servo0Angle = 0;
+int servo1Angle = 0;
 
 //generic Menu vars
 
@@ -204,7 +204,7 @@ void processController() {
     ch_vals[6] = 0;
   }
 
-  if(ch_vals[5] != 0){
+  if (ch_vals[5] != 0) {
     ch_vals[3] = ch_vals[5];
   }
 
@@ -214,12 +214,12 @@ void processController() {
     temp_ch3 = map(temp_ch3, 0, 508, -508, 508);
     ch_vals[3] = temp_ch3;
   }
-  
+
 
   int steeringVal = ChannelMap.accelerator != 0 ? ch_vals[ChannelMap.accelerator] : 0;
   int acceleratorVal = ChannelMap.steering != 0 ? ch_vals[ChannelMap.steering] : 0;
-  int servoAVal = ChannelMap.servo_a != 0 ? ch_vals[ChannelMap.servo_a] : 0;
-  int servoBVal = ChannelMap.servo_b != 0 ? ch_vals[ChannelMap.servo_b] : 0;
+  int servoAVal = ChannelMap.servo_0 != 0 ? ch_vals[ChannelMap.servo_0] : 0;
+  int servoBVal = ChannelMap.servo_1 != 0 ? ch_vals[ChannelMap.servo_1] : 0;
   int motorRVal = ChannelMap.motor_r != 0 ? ch_vals[ChannelMap.motor_r] : 0;
   int motorLVal = ChannelMap.motor_l != 0 ? ch_vals[ChannelMap.motor_l] : 0;
   int motorWVal = ChannelMap.motor_w != 0 ? ch_vals[ChannelMap.motor_w] : 0;
@@ -227,47 +227,53 @@ void processController() {
 
 
 
-  int leftThrottle = acceleratorVal + steeringVal;
-  int rightThrottle = acceleratorVal - steeringVal;
+  int leftMixedSpeed = acceleratorVal + steeringVal;
+  int rightMixedSpeed = acceleratorVal - steeringVal;
 
   // in some cases the max is 100, in some cases it is 200
   // let's factor in the difference so the max is always 200
   int diff = abs(abs(acceleratorVal) - abs(steeringVal));
-  leftThrottle = leftThrottle < 0 ? leftThrottle - diff : leftThrottle + diff;
-  rightThrottle = rightThrottle < 0 ? rightThrottle - diff : rightThrottle + diff;
+  leftMixedSpeed = leftMixedSpeed < 0 ? leftMixedSpeed - diff : leftMixedSpeed + diff;
+  rightMixedSpeed = rightMixedSpeed < 0 ? rightMixedSpeed - diff : rightMixedSpeed + diff;
 
   //Map from ±200 to ± 100 or whatever range you need
-  leftThrottle = map(leftThrottle, -1016, 1016, -512, 512);
-  rightThrottle = map(rightThrottle, -1016, 1016, -512, 512);
+  leftMixedSpeed = map(leftMixedSpeed, -1016, 1016, -512, 512);
+  rightMixedSpeed = map(rightMixedSpeed, -1016, 1016, -512, 512);
 
   //constrain
+  rightMixedSpeed = constrain(rightMixedSpeed, -512, 512);
+  leftMixedSpeed = constrain(leftMixedSpeed, -512, 512);
 
-  motRSpeed = constrain(rightThrottle, -512, 512);
-  motLSpeed = constrain(leftThrottle, -512, 512);
-
+  //assign
+  motRSpeed = rightMixedSpeed;
+  motLSpeed = leftMixedSpeed;
+  if (RemoteConfig.swap_lr_motors) {
+    motLSpeed = rightMixedSpeed;
+    motRSpeed = leftMixedSpeed;
+  }
 
 
   //weaps
   int temp_min = RemoteConfig.servo_mins[0];
   int temp_max = RemoteConfig.servo_maxs[0];
 
-  if (RemoteConfig.servo_a_reverse) {
-    temp_min = RemoteConfig.servo_mins[0];
-    temp_max = RemoteConfig.servo_maxs[0];
+  if (RemoteConfig.servo_0_reverse) {
+    temp_max = RemoteConfig.servo_mins[0];
+    temp_min = RemoteConfig.servo_maxs[0];
   }
 
-  servoAAngle = map(servoAVal, -508, 508, temp_min, temp_max);
+  servo0Angle = map(servoAVal, -508, 508, temp_min, temp_max);
 
 
   temp_min = RemoteConfig.servo_mins[1];
   temp_max = RemoteConfig.servo_maxs[1];
 
-  if (RemoteConfig.servo_a_reverse) {
-    temp_min = RemoteConfig.servo_mins[1];
-    temp_max = RemoteConfig.servo_maxs[1];
+  if (RemoteConfig.servo_1_reverse) {
+    temp_max = RemoteConfig.servo_mins[1];
+    temp_min = RemoteConfig.servo_maxs[1];
   }
 
-  servoBAngle = map(servoBVal, -508, 508, temp_min, temp_max);
+  servo1Angle = map(servoBVal, -508, 508, temp_min, temp_max);
 
   motWSpeed = map(motorWVal, -508, 508, -512, 512);
   motWSpeed = constrain(motWSpeed, -512, 512);
@@ -282,16 +288,16 @@ void processBoard() {
   Serial.print("  W:\t");
   Serial.print(motWSpeed);
   Serial.print("  A:\t");
-  Serial.print(servoAAngle);
+  Serial.print(servo0Angle);
   Serial.print("  B:\t");
-  Serial.println(servoBAngle);
+  Serial.println(servo1Angle);
   //*/
   if (failsafe || disable_movements) {
     motRSpeed = 0;
     motLSpeed = 0;
     motWSpeed = 0;
-    servoAAngle = -1;
-    servoBAngle = -1;
+    servo0Angle = -1;
+    servo1Angle = -1;
     RobotBoard.failsafe();
     return;
   }
@@ -300,11 +306,11 @@ void processBoard() {
   RobotBoard.motRSetSpeed(motRSpeed * RemoteConfig.motr_dir);
 
   if (BoardConfig.dc_servo) {
-    RobotBoard.motWSeekPot(servoAAngle, RemoteConfig.motw_dir);
-    RobotBoard.servoASetAngle(servoBAngle);
+    RobotBoard.motWSeekPot(servo0Angle, RemoteConfig.motw_dir);
+    RobotBoard.servoASetAngle(servo1Angle);
   } else {
-    RobotBoard.servoASetAngle(servoAAngle);
-    RobotBoard.servoBSetAngle(servoBAngle);
+    RobotBoard.servoASetAngle(servo0Angle);
+    RobotBoard.servoBSetAngle(servo1Angle);
     RobotBoard.motWSetSpeed(motWSpeed * RemoteConfig.motw_dir);
   }
 }
@@ -342,14 +348,21 @@ void handle_blink() {
         if (MenuListItem > 0) {
           LedTask.setBlinks(MenuListItem, 500, 2);
         } else {
-          LedTask.setBlinks(1, -1, 5);
+          LedTask.setBlinks(1, -1, 15);
+        }
+        break;
+      case MENU_SERVOS:
+        if (MenuCurrentServo) {
+          LedTask.setBlinks(2, 250, 4);
+        } else {
+          LedTask.setBlinks(1, 250, 4);
         }
         break;
     }
     return;
   }
   if (failsafe) {
-    LedTask.setBlinks(1, -1, 1);
+    LedTask.setBlinks(1, -1, 0.5);
     return;
   }
   LedTask.ledOn();
@@ -404,6 +417,7 @@ MenuCmd getControllerCmd() {
 
 void processMenuState(MenuCmd cmd) {
   //handle state code
+  int temp_angle = -1;
   switch (MenuStateCurrent) {
     case MENU_NONE:
       disable_movements = false;
@@ -411,14 +425,21 @@ void processMenuState(MenuCmd cmd) {
       break;
     case MENU_LIST:
       disable_movements = true;
+      if (connection_ok && MenuListItem == MENU_LIST) {
+        MenuListItem = MENU_SERVOS;
+      }
       switch (cmd) {
-        case CMD_DOWN:
+        case CMD_UP:
           MenuListItem = MenuListItem + 1;
           MenuListItem = constrain(MenuListItem, MenuListMin, MenuListMax);
+          Serial.print("menu index: ");
+          Serial.println(MenuListItem);
           break;
-        case CMD_UP:
+        case CMD_DOWN:
           MenuListItem = (MenuListMax + MenuListItem - 1) % MenuListMax;
           MenuListItem = constrain(MenuListItem, MenuListMin, MenuListMax);
+          Serial.print("menu index: ");
+          Serial.println(MenuListItem);
           break;
       }
       break;
@@ -426,60 +447,88 @@ void processMenuState(MenuCmd cmd) {
       disable_movements = false;
       switch (cmd) {
         case CMD_DOWN:
+          Serial.println("Set servo 0");
           MenuCurrentServo = 0;
           break;
         case CMD_UP:
+          Serial.println("Set servo 1");
           MenuCurrentServo = 1;
           break;
         case CMD_LEFT:
           if (MenuCurrentServoEPA) {
-            int temp_angle = RemoteConfig.servo_mins[MenuCurrentServo];
+            temp_angle = RemoteConfig.servo_mins[MenuCurrentServo];
             temp_angle = temp_angle - 10;
             temp_angle = constrain(temp_angle, 0, RemoteConfig.servo_maxs[MenuCurrentServo] - 20);
             RemoteConfig.servo_mins[MenuCurrentServo] = temp_angle;
           } else {
-            int temp_angle = RemoteConfig.servo_maxs[MenuCurrentServo];
+            temp_angle = RemoteConfig.servo_maxs[MenuCurrentServo];
             temp_angle = temp_angle - 10;
             temp_angle = constrain(temp_angle, RemoteConfig.servo_mins[MenuCurrentServo] + 20, 1023);
             RemoteConfig.servo_maxs[MenuCurrentServo] = temp_angle;
           }
+          Serial.print("Set EPA: ");
+          Serial.print(MenuCurrentServoEPA);
+          Serial.print(" for servo: ");
+          Serial.print(MenuCurrentServo);
+          Serial.print(" at ");
+          Serial.println(temp_angle);
           break;
         case CMD_RIGHT:
           if (MenuCurrentServoEPA) {
-            int temp_angle = RemoteConfig.servo_mins[MenuCurrentServo];
+            temp_angle = RemoteConfig.servo_mins[MenuCurrentServo];
             temp_angle = temp_angle + 10;
             temp_angle = constrain(temp_angle, 0, RemoteConfig.servo_maxs[MenuCurrentServo] - 20);
             RemoteConfig.servo_mins[MenuCurrentServo] = temp_angle;
           } else {
-            int temp_angle = RemoteConfig.servo_maxs[MenuCurrentServo];
+            temp_angle = RemoteConfig.servo_maxs[MenuCurrentServo];
             temp_angle = temp_angle + 10;
             temp_angle = constrain(temp_angle, RemoteConfig.servo_mins[MenuCurrentServo] + 20, 1023);
             RemoteConfig.servo_maxs[MenuCurrentServo] = temp_angle;
           }
+          Serial.print("Set EPA: ");
+          Serial.print(MenuCurrentServoEPA);
+          Serial.print(" for servo: ");
+          Serial.print(MenuCurrentServo);
+          Serial.print(" at ");
+          Serial.println(temp_angle);
           break;
         case CMD_X:
+
           MenuCurrentServoEPA = (MenuCurrentServoEPA + 1) % 2;
+          Serial.print("Modifying EPA: ");
+          Serial.print(MenuCurrentServoEPA);
+          Serial.print(", for servo: ");
+          Serial.println(MenuCurrentServo);
           break;
         case CMD_Y:
           if (MenuCurrentServo) {
-            RemoteConfig.servo_a_reverse = !RemoteConfig.servo_a_reverse;
+            RemoteConfig.servo_1_reverse = !RemoteConfig.servo_1_reverse;
+            Serial.print("Set direction: ");
+            Serial.print(RemoteConfig.servo_1_reverse);
+            Serial.print(", for servo: ");
+            Serial.println(MenuCurrentServo);
           } else {
-            RemoteConfig.servo_b_reverse = !RemoteConfig.servo_b_reverse;
+            RemoteConfig.servo_0_reverse = !RemoteConfig.servo_0_reverse;
+            Serial.print("Set direction: ");
+            Serial.print(RemoteConfig.servo_0_reverse);
+            Serial.print(", for servo: ");
+            Serial.println(MenuCurrentServo);
           }
+
           break;
       }
 
       if (MenuCurrentServo) {
         if (MenuCurrentServoEPA) {
-          servoBAngle = RemoteConfig.servo_mins[MenuCurrentServo];
+          servo1Angle = RemoteConfig.servo_mins[MenuCurrentServo];
         } else {
-          servoBAngle = RemoteConfig.servo_maxs[MenuCurrentServo];
+          servo1Angle = RemoteConfig.servo_maxs[MenuCurrentServo];
         }
       } else {
         if (MenuCurrentServoEPA) {
-          servoAAngle = RemoteConfig.servo_mins[MenuCurrentServo];
+          servo0Angle = RemoteConfig.servo_mins[MenuCurrentServo];
         } else {
-          servoAAngle = RemoteConfig.servo_maxs[MenuCurrentServo];
+          servo0Angle = RemoteConfig.servo_maxs[MenuCurrentServo];
         }
       }
 
@@ -490,15 +539,26 @@ void processMenuState(MenuCmd cmd) {
       switch (cmd) {
         case CMD_UP:
           RemoteConfig.motw_dir = RemoteConfig.motw_dir * -1;
+          Serial.print("Set direction: ");
+          Serial.print(RemoteConfig.motw_dir);
+          Serial.println(", for motor W");
           break;
         case CMD_LEFT:
           RemoteConfig.motl_dir = RemoteConfig.motl_dir * -1;
+          Serial.print("Set direction: ");
+          Serial.print(RemoteConfig.motl_dir);
+          Serial.println(", for motor L");
           break;
         case CMD_RIGHT:
           RemoteConfig.motr_dir = RemoteConfig.motr_dir * -1;
+          Serial.print("Set direction: ");
+          Serial.print(RemoteConfig.motr_dir);
+          Serial.println(", for motor R");
           break;
         case CMD_Y:
           RemoteConfig.swap_lr_motors = !RemoteConfig.swap_lr_motors;
+          Serial.print("Left and right motor swapped: ");
+          Serial.println(RemoteConfig.swap_lr_motors);
           break;
       }
       break;
@@ -553,9 +613,12 @@ void processMenuState(MenuCmd cmd) {
       switch (cmd) {
         case CMD_A:
           MenuStateNext = (MenuState)MenuListItem;
+          Serial.print("Entering menu: ");
+          Serial.println(MenuStateNext);
           break;
         case CMD_B:
           MenuStateNext = MENU_NONE;
+          Serial.print("Exiting Settings");
           break;
       }
       break;
@@ -564,10 +627,15 @@ void processMenuState(MenuCmd cmd) {
     case MENU_REMOTE:
       switch (cmd) {
         case CMD_A:
+          Serial.print("Exiting ");
+          Serial.println(MenuStateCurrent);
           SaveRemoteConfig(&RemoteConfig);
           MenuStateNext = MENU_LIST;
           break;
         case CMD_B:
+          Serial.print("Exiting ");
+          Serial.print(MenuStateCurrent);
+          Serial.println(" without saving");
           ESP.restart();
           MenuStateNext = MENU_LIST;
           break;
@@ -576,11 +644,15 @@ void processMenuState(MenuCmd cmd) {
     case MENU_BOARD:
       switch (cmd) {
         case CMD_A:
+          Serial.println("Saving Board, restart required");
           SaveBoardConfig(&BoardConfig);
           ESP.restart();
           MenuStateNext = MENU_LIST;
           break;
         case CMD_B:
+          Serial.print("Exiting ");
+          Serial.print(MenuStateCurrent);
+          Serial.println(" without saving");
           ESP.restart();
           MenuStateNext = MENU_LIST;
           break;
@@ -599,11 +671,16 @@ void processMenuState(MenuCmd cmd) {
     case MENU_RESET:
       switch (cmd) {
         case CMD_A:
+          Serial.println("Factory reset, restart required");
           ClearEeprom();
           ESP.restart();
           MenuStateNext = MENU_LIST;
           break;
         case CMD_B:
+        Serial.print("Exiting ");
+          Serial.print(MenuStateCurrent);
+          Serial.println(" without saving");
+          ESP.restart();
           MenuStateNext = MENU_LIST;
           break;
       }
@@ -615,18 +692,6 @@ void processMenuState(MenuCmd cmd) {
     Serial.print(cmd);
     Serial.print("->");
     Serial.println(MenuStateNext);
-    Serial.print(RemoteConfig.servo_maxs[MenuCurrentServo]);
-    Serial.print(" > ");
-    Serial.println(RemoteConfig.servo_mins[MenuCurrentServo]);
-    Serial.print("S:");
-    Serial.print(MenuCurrentServo);
-    Serial.print(" > E:");
-    Serial.println(MenuCurrentServoEPA);
-    Serial.print("A:");
-    Serial.print(servoAAngle);
-    Serial.print(" > B:");
-    Serial.println(servoBAngle);
-    Serial.println();
   }
 
   MenuStateCurrent = MenuStateNext;
@@ -645,7 +710,7 @@ void setup() {
 
   LedTask.init();
   InitEeprom();
-  if(MacEepromValid){
+  if (MacEepromValid) {
     binding = false;
   }
   Board::board_cfg_t init_cfg;

@@ -4,8 +4,8 @@ struct remote_config_t { //configs that can be applied live
   bool swap_sticks = false;
   bool ch3_centered = false;
   bool swap_lr_motors = false;
-  bool servo_a_reverse = false;
-  bool servo_b_reverse = false;
+  bool servo_0_reverse = false;
+  bool servo_1_reverse = false;
 
   int8_t ch1_dir = 1;
   int8_t ch2_dir = 1;
@@ -28,8 +28,8 @@ struct board_config_t { //config that need a restart to be applied
 struct channel_map_t{
   uint8_t steering = 1;
   uint8_t accelerator = 2; 
-  uint8_t servo_a = 3;
-  uint8_t servo_b = 4;
+  uint8_t servo_0 = 3;
+  uint8_t servo_1 = 4;
   uint8_t motor_r = 0;
   uint8_t motor_l = 0;
   uint8_t motor_w = 4;
