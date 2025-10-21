@@ -1,11 +1,11 @@
 #include <Bluepad32.h>
 #include <EEPROM.h>
 #include "src/ledUtility/ledUtility.h"
-#include "factory_settings.h"
+#include "eeprom_utils.h"
 
-
-#define C3SUPERMINI_CORE
+//#define C3SUPERMINI_CORE
 //#define C3SUPERMINI_DRV8833
+#define ESP32S3_RAC50
 //#define CUSTOM_BOARD
 
 /*
@@ -25,6 +25,11 @@ C3superminiCoreBoard RobotBoard;
 C3superminiDRV8833Board RobotBoard;
 #endif
 
+#ifdef ESP32S3_RAC50
+#include "src/ESP32S3RAC50Board/ESP32S3RAC50Board.h"
+ESP32S3RAC50Board RobotBoard;
+#endif
+
 #ifdef CUSTOM_BOARD
 #include "src/CustomBoard/CustomBoard.h"
 CustomBoard RobotBoard;
@@ -32,25 +37,16 @@ CustomBoard RobotBoard;
 
 LedUtility LedTask = LedUtility(&RobotBoard);
 
-const byte EEPROM_VALID_BYTE = RobotBoard.EEPROM_VALID_BYTE;
-const byte CLEAR_BYTE = 0;
 
 
 //global vars
-int version = 1;
 
-bool MacEepromValid = false;
-bool CfgRemoteEepromValid = false;
-bool CfgBoardEepromValid = false;
-
-bool setting = false;
-bool binding = true;
-
-
+String AntpadVersion = "0.1.0";
 ControllerPtr RemoteController;
-uint8_t ControllerAddress[6];
-remote_config_t RemoteConfig;
-board_config_t BoardConfig;
+unsigned long CurrentMs = 0;
+int ch_vals[7] = { 0, 0, 0, 0, 0, 0, 0 };
+
+bool binding = true;
 bool failsafe = true;
 bool connection_ok = false;
 
@@ -61,27 +57,51 @@ int motWSpeed = 0;
 int servoAAngle = 0;
 int servoBAngle = 0;
 
-const uint8_t ADDR_MAC_VALID = 0;
-const uint8_t ADDR_MAC = ADDR_MAC_VALID + sizeof(EEPROM_VALID_BYTE);
-const uint8_t ADDR_RMTCONFIG_VALID = ADDR_MAC + sizeof(ControllerAddress);
-const uint8_t ADDR_RMTCONFIG = ADDR_RMTCONFIG_VALID + sizeof(EEPROM_VALID_BYTE);
-const uint8_t ADDR_BOARDCONFIG_VALID = ADDR_RMTCONFIG + sizeof(RemoteConfig);
-const uint8_t ADDR_BOARDCONFIG = ADDR_BOARDCONFIG_VALID + sizeof(EEPROM_VALID_BYTE);
+//generic Menu vars
 
-bool cmd_up = false;
-bool cmd_down = false;
-bool cmd_enter = false;
-bool cmd_back = false;
+enum MenuCmd { CMD_UP,
+               CMD_DOWN,
+               CMD_LEFT,
+               CMD_RIGHT,
+               CMD_X,
+               CMD_Y,
+               CMD_A,
+               CMD_B,
+               CMD_AMOUNT,
+               CMD_NONE };
+bool CmdStates[CMD_AMOUNT];
+bool CmdStatesPrev[CMD_AMOUNT];
 
-bool state_up = false;
-bool state_down = false;
-bool state_enter = false;
-bool state_back = false;
+MenuCmd CmdLocked = CMD_NONE;
+MenuCmd CmdTriggered = CMD_NONE;
+unsigned long CmdLockMs = 0;
 
-bool state_up_pre = false;
-bool state_down_pre = false;
-bool state_enter_pre = false;
-bool state_back_pre = false;
+enum MenuState { MENU_LIST,
+                 MENU_SERVOS,
+                 MENU_MOTORS,
+                 MENU_REMOTE,
+                 MENU_BOARD,
+                 MENU_CHANNELS,
+                 MENU_RESET,
+                 MENU_NONE };
+
+MenuState MenuStateCurrent = MENU_NONE;
+MenuState MenuStateNext = MENU_LIST;
+bool disable_movements = false;
+
+//menu list vars
+uint8_t MenuListItem = MENU_LIST;
+uint8_t MenuListMax = MENU_RESET;
+uint8_t MenuListMin = MENU_SERVOS;
+bool MenuSaveRemote = false;
+bool MenuSaveBoard = false;
+
+//menu servo vars
+uint8_t MenuCurrentServo = 0;
+uint8_t MenuCurrentServoEPA = 0;
+
+
+
 
 // This callback gets called any time a new gamepad is connected.
 // Up to 4 gamepads can be connected at the same time.
@@ -94,30 +114,21 @@ void onConnectedController(ControllerPtr ctl) {
   if (MacEepromValid) {
     for (int b = 0; b < sizeof(ControllerAddress); b++) {
       if (ControllerAddress[b] != properties.btaddr[b]) {
-        valid_controller = false;
-        break;
+        Serial.println("WRONG => DSCONNECT");
+        ctl->disconnect();
+        return;
       }
     }
   } else {
-    EEPROM.writeBytes(ADDR_MAC_VALID, &EEPROM_VALID_BYTE, sizeof(EEPROM_VALID_BYTE));
-    EEPROM.writeBytes(ADDR_MAC, properties.btaddr, sizeof(ControllerAddress));
-    EEPROM.commit();
-    memcpy(ControllerAddress, properties.btaddr, sizeof(ControllerAddress));
-    MacEepromValid = true;
+    SaveMac(properties.btaddr);
+    LoadMac(ControllerAddress);
     Serial.printf("NEW => SAVED: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x \n", ControllerAddress[0], ControllerAddress[1], ControllerAddress[2], ControllerAddress[3], ControllerAddress[4], ControllerAddress[5]);
   }
-
-  if (valid_controller) {
-    failsafe = false;
-    RemoteController = ctl;
-    connection_ok = true;
-    BP32.enableNewBluetoothConnections(false);
-    Serial.println("VALID => LOCKED");
-  } else {
-    Serial.println("WRONG => DSCONNECT");
-    ctl->disconnect();
-    ;
-  }
+  RemoteController = ctl;
+  failsafe = false;
+  connection_ok = true;
+  BP32.enableNewBluetoothConnections(false);
+  Serial.println("VALID => LOCKED");
 }
 
 void onDisconnectedController(ControllerPtr ctl) {
@@ -129,16 +140,14 @@ void onDisconnectedController(ControllerPtr ctl) {
     for (int b = 0; b < sizeof(ControllerAddress); b++) {
       if (ControllerAddress[b] != properties.btaddr[b]) {
         valid_controller = false;
-        break;
+        return;
       }
     }
   }
-  if (valid_controller) {
-    failsafe = true;
-    BP32.enableNewBluetoothConnections(true);
-    Serial.println("VALID => UNLOCKED");
-    RemoteController = nullptr;
-  }
+  failsafe = true;
+  BP32.enableNewBluetoothConnections(true);
+  Serial.println("VALID => UNLOCKED");
+  RemoteController = nullptr;
 }
 
 void dumpGamepad(ControllerPtr ctl) {
@@ -158,76 +167,72 @@ void dumpGamepad(ControllerPtr ctl) {
   Serial.println();
 }
 
-int convertThrottle(int speed) {
-  if (speed = 0) {
-    return 0;
-  }
-  if (speed > 0) {
-    return speed;
-  }
-  if (speed < 0) {
-    return 1047 - speed;
-  }
-}
-
-
 void processController() {
   //dumpGamepad(RemoteController);
 
-  //int angle = RemoteController->axisY()+512;
-  //servoa_set_angle(angle);
-  //ServoASetAngle(1023);
+  ch_vals[1] = constrain(-RemoteController->axisRY() * RemoteConfig.ch1_dir, -508, 508);
+  ch_vals[2] = constrain(RemoteController->axisRX() * RemoteConfig.ch2_dir, -508, 508);
+  ch_vals[3] = constrain(-RemoteController->axisY() * RemoteConfig.ch3_dir, -508, 508);
+  ch_vals[4] = constrain(RemoteController->axisX() * RemoteConfig.ch4_dir, -508, 508);
+  ch_vals[5] = 508 * RemoteController->l1() - 508 * RemoteController->r1();
+  ch_vals[6] = RemoteController->throttle() - RemoteController->brake();
 
-
-
-  int ch1 = -RemoteController->axisRY();
-  int ch2 = RemoteController->axisRX();
-  int ch3 = -RemoteController->axisY();
-  int ch4 = RemoteController->axisX();
-  bool ch3_full = RemoteController->l1();
-  bool ch3_rev = RemoteController->r1();
-
-  if (RemoteConfig.left_stick) {
-    ch1 = -RemoteController->axisY();
-    ch2 = RemoteController->axisX();
-    ch3 = -RemoteController->axisRY();
-    ch4 = RemoteController->axisRX();
-  }
-  if(false){
-    ch1 = RemoteController->throttle() - RemoteController->brake();
-    ch2 = RemoteController->axisRX();
-  ch3 = -RemoteController->axisY();
-  ch4 = RemoteController->axisX();
+  if (RemoteConfig.swap_sticks) {
+    ch_vals[3] = constrain(-RemoteController->axisRY() * RemoteConfig.ch1_dir, -508, 508);
+    ch_vals[4] = constrain(RemoteController->axisRX() * RemoteConfig.ch2_dir, -508, 508);
+    ch_vals[1] = constrain(-RemoteController->axisY() * RemoteConfig.ch3_dir, -508, 508);
+    ch_vals[2] = constrain(RemoteController->axisX() * RemoteConfig.ch4_dir, -508, 508);
+    ch_vals[5] = 508 * RemoteController->r1() - 508 * RemoteController->l1();
+    ch_vals[6] = RemoteController->throttle() - RemoteController->brake();
   }
 
-  ch1 = ch1 * RemoteConfig.ch1_reverse;
-  ch2 = ch2 * RemoteConfig.ch2_reverse;
-  ch3 = ch3 * RemoteConfig.ch3_reverse;
-  ch4 = ch4 * RemoteConfig.ch4_reverse;
 
-  //setups
-  ch1 = constrain(ch1, -508, 508);
-  ch2 = constrain(ch2, -508, 508);
+  if (abs(ch_vals[1]) < 50) {
+    ch_vals[1] = 0;
+  }
+  if (abs(ch_vals[2]) < 50) {
+    ch_vals[2] = 0;
+  }
+  if (abs(ch_vals[3]) < 50) {
+    ch_vals[3] = 0;
+  }
+  if (abs(ch_vals[4]) < 50) {
+    ch_vals[4] = 0;
+  }
 
-  if (ch3_rev) {
-    ch3 = -508;
+  if (abs(ch_vals[6]) < 50) {
+    ch_vals[6] = 0;
   }
-  if (ch3_full) {
-    ch3 = 508;
-  }
-  if (RemoteConfig.ch3_bdir) {
-    ch3 = constrain(ch3, -508, 508);
-  } else {
-    ch3 = constrain(ch3, 0, 508);
-  }
-  ch4 = constrain(ch4, -508, 508);
 
-  int leftThrottle = ch1 + ch2;
-  int rightThrottle = ch1 - ch2;
+  if(ch_vals[5] != 0){
+    ch_vals[3] = ch_vals[5];
+  }
+
+  if (!RemoteConfig.ch3_centered) {
+    int temp_ch3 = ch_vals[3];
+    temp_ch3 = constrain(temp_ch3, 0, 508);
+    temp_ch3 = map(temp_ch3, 0, 508, -508, 508);
+    ch_vals[3] = temp_ch3;
+  }
+  
+
+  int steeringVal = ChannelMap.accelerator != 0 ? ch_vals[ChannelMap.accelerator] : 0;
+  int acceleratorVal = ChannelMap.steering != 0 ? ch_vals[ChannelMap.steering] : 0;
+  int servoAVal = ChannelMap.servo_a != 0 ? ch_vals[ChannelMap.servo_a] : 0;
+  int servoBVal = ChannelMap.servo_b != 0 ? ch_vals[ChannelMap.servo_b] : 0;
+  int motorRVal = ChannelMap.motor_r != 0 ? ch_vals[ChannelMap.motor_r] : 0;
+  int motorLVal = ChannelMap.motor_l != 0 ? ch_vals[ChannelMap.motor_l] : 0;
+  int motorWVal = ChannelMap.motor_w != 0 ? ch_vals[ChannelMap.motor_w] : 0;
+
+
+
+
+  int leftThrottle = acceleratorVal + steeringVal;
+  int rightThrottle = acceleratorVal - steeringVal;
 
   // in some cases the max is 100, in some cases it is 200
   // let's factor in the difference so the max is always 200
-  int diff = abs(abs(ch1) - abs(ch2));
+  int diff = abs(abs(acceleratorVal) - abs(steeringVal));
   leftThrottle = leftThrottle < 0 ? leftThrottle - diff : leftThrottle + diff;
   rightThrottle = rightThrottle < 0 ? rightThrottle - diff : rightThrottle + diff;
 
@@ -243,75 +248,29 @@ void processController() {
 
 
   //weaps
-  int temp_min = BoardConfig.servo_a_min;
-  int temp_max = BoardConfig.servo_a_max;
+  int temp_min = RemoteConfig.servo_mins[0];
+  int temp_max = RemoteConfig.servo_maxs[0];
 
-  if(BoardConfig.servo_a_reverse){
-    temp_min = BoardConfig.servo_a_max;
-    temp_max = BoardConfig.servo_a_min;
+  if (RemoteConfig.servo_a_reverse) {
+    temp_min = RemoteConfig.servo_mins[0];
+    temp_max = RemoteConfig.servo_maxs[0];
   }
 
-  if (RemoteConfig.ch3_bdir) {
-    servoAAngle = map(ch3, -508, 508, temp_min, temp_max);
-  } else {
-    servoAAngle = map(ch3, 0, 508, temp_min, temp_max);
+  servoAAngle = map(servoAVal, -508, 508, temp_min, temp_max);
+
+
+  temp_min = RemoteConfig.servo_mins[1];
+  temp_max = RemoteConfig.servo_maxs[1];
+
+  if (RemoteConfig.servo_a_reverse) {
+    temp_min = RemoteConfig.servo_mins[1];
+    temp_max = RemoteConfig.servo_maxs[1];
   }
 
-  temp_min = BoardConfig.servo_b_min;
-  temp_max = BoardConfig.servo_b_max;
-  if(BoardConfig.servo_a_reverse){
-    temp_min = BoardConfig.servo_b_max;
-    temp_max = BoardConfig.servo_b_min;
-  }
+  servoBAngle = map(servoBVal, -508, 508, temp_min, temp_max);
 
-  servoBAngle = map(ch4, -508, 508, temp_min, temp_max);
-
-  motWSpeed = map(ch4, -508, 508, -512, 512);
+  motWSpeed = map(motorWVal, -508, 508, -512, 512);
   motWSpeed = constrain(motWSpeed, -512, 512);
-
-
-
-  //cmds
-  cmd_up = false;
-  cmd_down = false;
-  cmd_enter = false;
-  cmd_back = false;
-
-  state_up = RemoteController->dpad() & 0b1;
-  state_down = RemoteController->dpad() & 0b10;
-  state_enter = RemoteController->a();
-  state_back = RemoteController->b();
-
-  if (!state_up && state_up_pre) {
-    cmd_up = true;
-  }
-
-  if (!state_down && state_down_pre) {
-    cmd_down = true;
-  }
-
-  if (!state_enter && state_enter_pre) {
-    cmd_enter = true;
-  }
-
-  if (!state_back && state_back_pre) {
-    cmd_back = true;
-  }
-
-  state_up_pre = state_up;
-  state_down_pre = state_down;
-  state_enter_pre = state_enter;
-  state_back_pre = state_back;
-
-
-
-
-  /*
-  Serial.print(cmd_up);
-  Serial.print(cmd_down);
-  Serial.print(cmd_enter);
-  Serial.println(cmd_back);
-  //*/
 }
 
 void processBoard() {
@@ -327,11 +286,7 @@ void processBoard() {
   Serial.print("  B:\t");
   Serial.println(servoBAngle);
   //*/
-  if (failsafe) {
-    cmd_up = false;
-    cmd_down = false;
-    cmd_enter = false;
-    cmd_back = false;
+  if (failsafe || disable_movements) {
     motRSpeed = 0;
     motLSpeed = 0;
     motWSpeed = 0;
@@ -341,42 +296,17 @@ void processBoard() {
     return;
   }
 
-  RobotBoard.motLSetSpeed(motLSpeed * BoardConfig.motl_reverse);
-  RobotBoard.motRSetSpeed(motRSpeed * BoardConfig.motr_reverse);
-  RobotBoard.motWSetSpeed(motWSpeed * BoardConfig.motw_reverse);
+  RobotBoard.motLSetSpeed(motLSpeed * RemoteConfig.motl_dir);
+  RobotBoard.motRSetSpeed(motRSpeed * RemoteConfig.motr_dir);
 
-  RobotBoard.servoASetAngle(servoAAngle);
-  RobotBoard.servoBSetAngle(servoBAngle);
-}
-
-void initEeprom() {
-  Serial.println("EEPROM start");
-  EEPROM.begin(64);
-  byte valid = EEPROM.readByte(ADDR_MAC_VALID);
-  if (valid == EEPROM_VALID_BYTE  && !factory_reset) {
-    EEPROM.readBytes(ADDR_MAC, &ControllerAddress, sizeof(ControllerAddress));
-    MacEepromValid = true;
-    binding = false;
-    Serial.println("-> Loaded MAC");
+  if (BoardConfig.dc_servo) {
+    RobotBoard.motWSeekPot(servoAAngle, RemoteConfig.motw_dir);
+    RobotBoard.servoASetAngle(servoBAngle);
   } else {
-    Serial.println("-> no MAC");
+    RobotBoard.servoASetAngle(servoAAngle);
+    RobotBoard.servoBSetAngle(servoBAngle);
+    RobotBoard.motWSetSpeed(motWSpeed * RemoteConfig.motw_dir);
   }
-  valid = EEPROM.readByte(ADDR_RMTCONFIG_VALID);
-  if (valid == EEPROM_VALID_BYTE && !factory_reset) {
-    EEPROM.readBytes(ADDR_RMTCONFIG, &RemoteConfig, sizeof(RemoteConfig));
-    CfgRemoteEepromValid = true;
-    Serial.println("-> Loaded RMT");
-  } else {
-    Serial.println("-> no RMT");
-  }
-  valid = EEPROM.readByte(ADDR_BOARDCONFIG_VALID);
-  if (valid == EEPROM_VALID_BYTE && !factory_reset) {
-    EEPROM.readBytes(ADDR_BOARDCONFIG, &BoardConfig, sizeof(BoardConfig));
-    Serial.println("-> Loaded BOARD");
-  } else {
-    Serial.println("-> no BOARD");
-  }
-  Serial.println("EEPROM end");
 }
 
 
@@ -384,16 +314,15 @@ void check_mode() {
   unsigned long current_time = millis();
   if (!connection_ok) {
     if (current_time > 60000 && binding == false) {
-      Serial.println("rebinding");
+      Serial.println("ENTERED BINDING");
+      MenuStateCurrent = MENU_NONE;
       MacEepromValid = false;
       binding = true;
-      EEPROM.writeBytes(ADDR_MAC_VALID, &CLEAR_BYTE, sizeof(CLEAR_BYTE));
-      EEPROM.commit();
       return;
     }
-    if (current_time > 6000 && setting == false) {
-      Serial.println("setting...");
-      setting = true;
+    if (current_time > 6000 && MenuStateCurrent == MENU_NONE && current_time < 59000) {
+      Serial.println("ENTERED SETTINGS");
+      MenuStateCurrent = MENU_LIST;
       return;
     }
   } else {
@@ -402,19 +331,20 @@ void check_mode() {
 }
 
 
-
-int setting_mode = 0;
-
 void handle_blink() {
   if (binding) {
     LedTask.setBlinks(2, 500, 10);
     return;
   }
-  if (setting) {
-    if (setting_mode == 0) {
-      LedTask.setBlinks(1, -1, 15);
-    } else {
-      LedTask.setBlinks(1, -1, 5);
+  if (MenuStateCurrent != MENU_NONE) {
+    switch (MenuStateCurrent) {
+      case MENU_LIST:
+        if (MenuListItem > 0) {
+          LedTask.setBlinks(MenuListItem, 500, 2);
+        } else {
+          LedTask.setBlinks(1, -1, 5);
+        }
+        break;
     }
     return;
   }
@@ -425,55 +355,282 @@ void handle_blink() {
   LedTask.ledOn();
 }
 
+MenuCmd getControllerCmd() {
+  MenuCmd resultMenuCmd = CMD_NONE;
+  CmdStates[CMD_UP] = RemoteController->dpad() & 0b1;
+  CmdStates[CMD_DOWN] = RemoteController->dpad() & 0b10;
+  CmdStates[CMD_LEFT] = RemoteController->dpad() & 0b1000;
+  CmdStates[CMD_RIGHT] = RemoteController->dpad() & 0b100;
+  CmdStates[CMD_A] = RemoteController->a();
+  CmdStates[CMD_B] = RemoteController->b();
+  CmdStates[CMD_Y] = RemoteController->y();
+  CmdStates[CMD_X] = RemoteController->x();
 
-void processCmd() {
-  if (!setting) {
-    return;
-  }
-
-  if (cmd_back) {
-    EEPROM.writeBytes(ADDR_BOARDCONFIG_VALID, &EEPROM_VALID_BYTE, sizeof(EEPROM_VALID_BYTE));
-    EEPROM.writeBytes(ADDR_BOARDCONFIG, &BoardConfig, sizeof(BoardConfig));
-    EEPROM.commit();
-    setting = false;
-  }
-
-  if (cmd_enter) {
-    setting_mode = (setting_mode + 1) % 2;
-  }
-
-  if (setting_mode == 1) {
-    int temp_angle = BoardConfig.servo_a_min;
-    if (cmd_up) {
-      temp_angle = temp_angle + 10;
-      temp_angle = constrain(temp_angle, 0, BoardConfig.servo_a_max - 20);
-      BoardConfig.servo_a_min = temp_angle;
+  if (CmdLocked == CMD_NONE) {
+    for (uint8_t cmd_i; cmd_i < CMD_AMOUNT; cmd_i++) {
+      /*
+      Serial.print(cmd_i);
+      Serial.print("->");
+      Serial.print(CmdStatesPrev[cmd_i]);
+      Serial.print(">");
+      Serial.print(CmdStates[cmd_i]);
+      Serial.print(",  ");
+      //*/
+      if (!CmdStatesPrev[cmd_i] && CmdStates[cmd_i]) {
+        CmdLocked = (MenuCmd)cmd_i;
+        CmdLockMs = CurrentMs;
+        break;
+      }
     }
-    if (cmd_down) {
-      temp_angle = temp_angle - 10;
-      temp_angle = constrain(temp_angle, 0, BoardConfig.servo_a_max - 20);
-      BoardConfig.servo_a_min = temp_angle;
+    //Serial.println();
+  } else {
+    //Serial.print(CurrentMs - CmdLockMs);
+    //Serial.print(",  ");
+    //Serial.println(CmdLocked);
+    if (!CmdStates[CmdLocked]) {
+      if (CurrentMs - CmdLockMs > 100) {
+        resultMenuCmd = CmdLocked;
+      }
+      CmdLocked = CMD_NONE;
+      CmdLockMs = 0;
     }
-    servoAAngle = BoardConfig.servo_a_min;
   }
 
-  if (setting_mode == 0) {
-    int temp_angle = BoardConfig.servo_a_max;
-    if (cmd_up) {
-      temp_angle = temp_angle + 10;
-      temp_angle = constrain(temp_angle, BoardConfig.servo_a_min + 20, 1023);
-      BoardConfig.servo_a_max = temp_angle;
-    }
-    if (cmd_down) {
-      temp_angle = temp_angle - 10;
-      temp_angle = constrain(temp_angle, BoardConfig.servo_a_min + 20, 1023);
-      BoardConfig.servo_a_max = temp_angle;
-    }
-    servoAAngle = BoardConfig.servo_a_max;
+  for (uint8_t cmd_i; cmd_i < CMD_AMOUNT; cmd_i++) {
+    CmdStatesPrev[cmd_i] = CmdStates[cmd_i];
   }
-  Serial.print(BoardConfig.servo_a_min);
-  Serial.print("  ");
-  Serial.println(BoardConfig.servo_a_max);
+  return resultMenuCmd;
+}
+
+void processMenuState(MenuCmd cmd) {
+  //handle state code
+  switch (MenuStateCurrent) {
+    case MENU_NONE:
+      disable_movements = false;
+      return;
+      break;
+    case MENU_LIST:
+      disable_movements = true;
+      switch (cmd) {
+        case CMD_DOWN:
+          MenuListItem = MenuListItem + 1;
+          MenuListItem = constrain(MenuListItem, MenuListMin, MenuListMax);
+          break;
+        case CMD_UP:
+          MenuListItem = (MenuListMax + MenuListItem - 1) % MenuListMax;
+          MenuListItem = constrain(MenuListItem, MenuListMin, MenuListMax);
+          break;
+      }
+      break;
+    case MENU_SERVOS:
+      disable_movements = false;
+      switch (cmd) {
+        case CMD_DOWN:
+          MenuCurrentServo = 0;
+          break;
+        case CMD_UP:
+          MenuCurrentServo = 1;
+          break;
+        case CMD_LEFT:
+          if (MenuCurrentServoEPA) {
+            int temp_angle = RemoteConfig.servo_mins[MenuCurrentServo];
+            temp_angle = temp_angle - 10;
+            temp_angle = constrain(temp_angle, 0, RemoteConfig.servo_maxs[MenuCurrentServo] - 20);
+            RemoteConfig.servo_mins[MenuCurrentServo] = temp_angle;
+          } else {
+            int temp_angle = RemoteConfig.servo_maxs[MenuCurrentServo];
+            temp_angle = temp_angle - 10;
+            temp_angle = constrain(temp_angle, RemoteConfig.servo_mins[MenuCurrentServo] + 20, 1023);
+            RemoteConfig.servo_maxs[MenuCurrentServo] = temp_angle;
+          }
+          break;
+        case CMD_RIGHT:
+          if (MenuCurrentServoEPA) {
+            int temp_angle = RemoteConfig.servo_mins[MenuCurrentServo];
+            temp_angle = temp_angle + 10;
+            temp_angle = constrain(temp_angle, 0, RemoteConfig.servo_maxs[MenuCurrentServo] - 20);
+            RemoteConfig.servo_mins[MenuCurrentServo] = temp_angle;
+          } else {
+            int temp_angle = RemoteConfig.servo_maxs[MenuCurrentServo];
+            temp_angle = temp_angle + 10;
+            temp_angle = constrain(temp_angle, RemoteConfig.servo_mins[MenuCurrentServo] + 20, 1023);
+            RemoteConfig.servo_maxs[MenuCurrentServo] = temp_angle;
+          }
+          break;
+        case CMD_X:
+          MenuCurrentServoEPA = (MenuCurrentServoEPA + 1) % 2;
+          break;
+        case CMD_Y:
+          if (MenuCurrentServo) {
+            RemoteConfig.servo_a_reverse = !RemoteConfig.servo_a_reverse;
+          } else {
+            RemoteConfig.servo_b_reverse = !RemoteConfig.servo_b_reverse;
+          }
+          break;
+      }
+
+      if (MenuCurrentServo) {
+        if (MenuCurrentServoEPA) {
+          servoBAngle = RemoteConfig.servo_mins[MenuCurrentServo];
+        } else {
+          servoBAngle = RemoteConfig.servo_maxs[MenuCurrentServo];
+        }
+      } else {
+        if (MenuCurrentServoEPA) {
+          servoAAngle = RemoteConfig.servo_mins[MenuCurrentServo];
+        } else {
+          servoAAngle = RemoteConfig.servo_maxs[MenuCurrentServo];
+        }
+      }
+
+      break;
+    case MENU_MOTORS:
+      disable_movements = false;
+
+      switch (cmd) {
+        case CMD_UP:
+          RemoteConfig.motw_dir = RemoteConfig.motw_dir * -1;
+          break;
+        case CMD_LEFT:
+          RemoteConfig.motl_dir = RemoteConfig.motl_dir * -1;
+          break;
+        case CMD_RIGHT:
+          RemoteConfig.motr_dir = RemoteConfig.motr_dir * -1;
+          break;
+        case CMD_Y:
+          RemoteConfig.swap_lr_motors = !RemoteConfig.swap_lr_motors;
+          break;
+      }
+      break;
+    case MENU_REMOTE:
+      disable_movements = false;
+      switch (cmd) {
+        case CMD_DOWN:
+          RemoteConfig.ch1_dir = RemoteConfig.ch1_dir * -1;
+          break;
+        case CMD_UP:
+          RemoteConfig.ch3_dir = RemoteConfig.ch3_dir * -1;
+          break;
+        case CMD_LEFT:
+          RemoteConfig.ch4_dir = RemoteConfig.ch4_dir * -1;
+          break;
+        case CMD_RIGHT:
+          RemoteConfig.ch2_dir = RemoteConfig.ch2_dir * -1;
+          break;
+        case CMD_Y:
+          RemoteConfig.swap_sticks = !RemoteConfig.swap_sticks;
+          break;
+        case CMD_X:
+          RemoteConfig.ch3_centered = !RemoteConfig.ch3_centered;
+          break;
+      }
+      break;
+    case MENU_BOARD:
+      disable_movements = true;
+      switch (cmd) {
+        case CMD_DOWN:
+          BoardConfig.dc_servo = false;
+          break;
+        case CMD_UP:
+          BoardConfig.dc_servo = true;
+          break;
+        case CMD_LEFT:
+          BoardConfig.servo_stretcher = false;
+          break;
+        case CMD_RIGHT:
+          BoardConfig.servo_stretcher = true;
+          break;
+      }
+      break;
+  }
+
+  //handle transitions between states
+  switch (MenuStateCurrent) {
+    case MENU_NONE:
+      return;
+      break;
+    case MENU_LIST:
+      switch (cmd) {
+        case CMD_A:
+          MenuStateNext = (MenuState)MenuListItem;
+          break;
+        case CMD_B:
+          MenuStateNext = MENU_NONE;
+          break;
+      }
+      break;
+    case MENU_SERVOS:
+    case MENU_MOTORS:
+    case MENU_REMOTE:
+      switch (cmd) {
+        case CMD_A:
+          SaveRemoteConfig(&RemoteConfig);
+          MenuStateNext = MENU_LIST;
+          break;
+        case CMD_B:
+          ESP.restart();
+          MenuStateNext = MENU_LIST;
+          break;
+      }
+      break;
+    case MENU_BOARD:
+      switch (cmd) {
+        case CMD_A:
+          SaveBoardConfig(&BoardConfig);
+          ESP.restart();
+          MenuStateNext = MENU_LIST;
+          break;
+        case CMD_B:
+          ESP.restart();
+          MenuStateNext = MENU_LIST;
+          break;
+      }
+      break;
+    case MENU_CHANNELS:
+      switch (cmd) {
+        case CMD_A:
+          MenuStateNext = MENU_LIST;
+          break;
+        case CMD_B:
+          MenuStateNext = MENU_LIST;
+          break;
+      }
+      break;
+    case MENU_RESET:
+      switch (cmd) {
+        case CMD_A:
+          ClearEeprom();
+          ESP.restart();
+          MenuStateNext = MENU_LIST;
+          break;
+        case CMD_B:
+          MenuStateNext = MENU_LIST;
+          break;
+      }
+      break;
+  }
+  if (cmd != CMD_NONE) {
+    Serial.print(MenuStateCurrent);
+    Serial.print("->");
+    Serial.print(cmd);
+    Serial.print("->");
+    Serial.println(MenuStateNext);
+    Serial.print(RemoteConfig.servo_maxs[MenuCurrentServo]);
+    Serial.print(" > ");
+    Serial.println(RemoteConfig.servo_mins[MenuCurrentServo]);
+    Serial.print("S:");
+    Serial.print(MenuCurrentServo);
+    Serial.print(" > E:");
+    Serial.println(MenuCurrentServoEPA);
+    Serial.print("A:");
+    Serial.print(servoAAngle);
+    Serial.print(" > B:");
+    Serial.println(servoBAngle);
+    Serial.println();
+  }
+
+  MenuStateCurrent = MenuStateNext;
+  CmdTriggered = CMD_NONE;
 }
 
 
@@ -481,15 +638,24 @@ void processCmd() {
 void setup() {
   Serial.begin(115200);
   Serial.printf("Firmware: %s\n", BP32.firmwareVersion());
-  Serial.print("Antpad version: ");
-  Serial.println(version);
+  Serial.printf("Antpad: %s\n", AntpadVersion);
   const uint8_t* addr = BP32.localBdAddress();
   Serial.printf("BD Addr: %2X:%2X:%2X:%2X:%2X:%2X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
 
-  RobotBoard.boardInit();
-  LedTask.init();
-  initEeprom();
 
+  LedTask.init();
+  InitEeprom();
+  if(MacEepromValid){
+    binding = false;
+  }
+  Board::board_cfg_t init_cfg;
+  init_cfg.dc_servo = BoardConfig.dc_servo;
+  init_cfg.servo_stretcher = BoardConfig.servo_stretcher;
+  RobotBoard.boardInit(init_cfg);
+  for (int cmd_i; cmd_i < CMD_AMOUNT; cmd_i++) {
+    CmdStates[cmd_i] = false;
+    CmdStatesPrev[cmd_i] = false;
+  }
 
   // Setup the Bluepad32 callbacks
   BP32.setup(&onConnectedController, &onDisconnectedController);
@@ -507,6 +673,8 @@ void setup() {
   // - Second one, which is a "virtual device", is a mouse.
   // By default, it is disabled.
   BP32.enableVirtualDevice(false);
+  analogReadResolution(11);
+  analogSetAttenuation(ADC_11db);
 }
 
 // Arduino loop function. Runs in CPU 1.
@@ -514,13 +682,14 @@ void loop() {
   // This call fetches all the controllers' data.
   // Call this function in your main loop.
   bool dataUpdated = BP32.update();
-
+  CurrentMs = millis();
   if (RemoteController != nullptr && !failsafe) {
     if (dataUpdated) {
       processController();
+      CmdTriggered = getControllerCmd();
     }
   }
-  processCmd();
+  processMenuState(CmdTriggered);
   processBoard();
 
   // The main loop must have some kind of "yield to lower priority task" event.
@@ -529,7 +698,7 @@ void loop() {
   // Detailed info here:
   // https://stackoverflow.com/questions/66278271/task-watchdog-got-triggered-the-tasks-did-not-reset-the-watchdog-in-time
 
-  //     vTaskDelay(1);
+  vTaskDelay(1);
   check_mode();
   handle_blink();
   delay(10);
