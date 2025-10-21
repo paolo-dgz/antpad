@@ -30,8 +30,8 @@ listaa menu:
         a salva e torna alla lista
 
 3 radiocomando
-    down inverti ch 1
-    right inverti ch 2
+    right inverti ch 1
+    down inverti ch 2
     up inverti ch 3
     left inverti ch 4
     y inverti stick
