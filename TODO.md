@@ -1,9 +1,9 @@
 ### Todo
 
 - [ ] add board and control images @paolo_dgz  
-- [ ] add board live setting @paolo_dgz  
-  - [ ] EPA
-  - [ ] Sticks Mode 
+- [ ] add to board live setting @paolo_dgz  
+  - [ ]  motor EPA
+  - [ ]  channel mapping
 
 ### In Progress
 
@@ -11,4 +11,7 @@
 
 ### Done ✓
 
-- [x] Create my first TODO.md  
+- [✓] add board live setting @paolo_dgz  
+  - [✓]  servo EPA
+  - [✓] Sticks Mode 
+- [✓] Create my first TODO.md  

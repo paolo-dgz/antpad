@@ -1,3 +1,4 @@
+#define RAC41
 #include <Bluepad32.h>
 #include <EEPROM.h>
 #include "src/ledUtility/ledUtility.h"
@@ -5,7 +6,7 @@
 
 //#define C3SUPERMINI_CORE
 //#define C3SUPERMINI_DRV8833
-#define ESP32S3_RAC50
+#define ESP32S3_RAC //please navigate to src/ESP32S3RACBoard/RACPinouts.h to chose board version, default is 5.0
 //#define CUSTOM_BOARD
 
 /*
@@ -25,9 +26,9 @@ C3superminiCoreBoard RobotBoard;
 C3superminiDRV8833Board RobotBoard;
 #endif
 
-#ifdef ESP32S3_RAC50
-#include "src/ESP32S3RAC50Board/ESP32S3RAC50Board.h"
-ESP32S3RAC50Board RobotBoard;
+#ifdef ESP32S3_RAC
+#include "src/ESP32S3RACBoard/ESP32S3RACBoard.h"
+ESP32S3RACBoard RobotBoard;
 #endif
 
 #ifdef CUSTOM_BOARD
@@ -44,6 +45,7 @@ LedUtility LedTask = LedUtility(&RobotBoard);
 String AntpadVersion = "0.1.1";
 ControllerPtr RemoteController;
 unsigned long CurrentMs = 0;
+unsigned long BootMs = 0;
 int ch_vals[7] = { 0, 0, 0, 0, 0, 0, 0 };
 
 bool binding = true;
@@ -287,6 +289,8 @@ void processBoard() {
   Serial.print(motLSpeed);
   Serial.print("  W:\t");
   Serial.print(motWSpeed);
+  Serial.print("  W2:\t");
+  Serial.print(motW2Speed);
   Serial.print("  A:\t");
   Serial.print(servo0Angle);
   Serial.print("  B:\t");
@@ -304,6 +308,7 @@ void processBoard() {
 
   RobotBoard.motLSetSpeed(motLSpeed * RemoteConfig.motl_dir);
   RobotBoard.motRSetSpeed(motRSpeed * RemoteConfig.motr_dir);
+  
 
   if (BoardConfig.dc_servo) {
     RobotBoard.motWSeekPot(servo0Angle, RemoteConfig.motw_dir);
@@ -319,14 +324,14 @@ void processBoard() {
 void check_mode() {
   unsigned long current_time = millis();
   if (!connection_ok) {
-    if (current_time > 60000 && binding == false) {
+    if (current_time > 60000 + BootMs && binding == false) {
       Serial.println("ENTERED BINDING");
       MenuStateCurrent = MENU_NONE;
       MacEepromValid = false;
       binding = true;
       return;
     }
-    if (current_time > 6000 && MenuStateCurrent == MENU_NONE && current_time < 59000) {
+    if (current_time > 6000 + BootMs && MenuStateCurrent == MENU_NONE && current_time < 59000) {
       Serial.println("ENTERED SETTINGS");
       MenuStateCurrent = MENU_LIST;
       return;
@@ -677,7 +682,7 @@ void processMenuState(MenuCmd cmd) {
           MenuStateNext = MENU_LIST;
           break;
         case CMD_B:
-        Serial.print("Exiting ");
+          Serial.print("Exiting ");
           Serial.print(MenuStateCurrent);
           Serial.println(" without saving");
           ESP.restart();
@@ -738,8 +743,9 @@ void setup() {
   // - Second one, which is a "virtual device", is a mouse.
   // By default, it is disabled.
   BP32.enableVirtualDevice(false);
-  analogReadResolution(11);
+  analogReadResolution(10);
   analogSetAttenuation(ADC_11db);
+  BootMs = millis();
 }
 
 // Arduino loop function. Runs in CPU 1.

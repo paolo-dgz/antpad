@@ -1,10 +1,16 @@
-#define ARDUINO_ESP32S3_DEV
 #ifdef ARDUINO_ESP32S3_DEV
-#include "ESP32S3RAC50Board.h"
+#include "ESP32S3RACBoard.h"
 
 // private
-void ESP32S3RAC50Board::setMotorSpeed(mcpwm_unit_t unit, mcpwm_timer_t timer, int speed)
+void ESP32S3RACBoard::setMotorSpeed(mcpwm_unit_t unit, mcpwm_timer_t timer, int speed)
 {
+  /*
+  Serial.print(unit);
+  Serial.print("\t");
+  Serial.print(timer);
+  Serial.print("\t");
+  Serial.println(speed);
+  //*/
   speed = constrain(speed, -512, 512);
 
   float duty = ((float)abs(speed)) / 5.12f;
@@ -28,7 +34,7 @@ void ESP32S3RAC50Board::setMotorSpeed(mcpwm_unit_t unit, mcpwm_timer_t timer, in
   }
 }
 
-void ESP32S3RAC50Board::setServoAngle(char servo_ledcch, int angle)
+void ESP32S3RACBoard::setServoAngle(char servo_ledcch, int angle)
 {
   angle = constrain(angle, 0, 1023);
   int duty = map(angle, 0, 1023, servo_min_duty, servo_max_duty);
@@ -36,7 +42,7 @@ void ESP32S3RAC50Board::setServoAngle(char servo_ledcch, int angle)
 }
 
 // public
-void ESP32S3RAC50Board::boardInit(board_cfg_t init_cfg)
+void ESP32S3RACBoard::boardInit(board_cfg_t init_cfg)
 {
   Serial.println("DRV8833 init");
   board_cfg = init_cfg;
@@ -72,7 +78,7 @@ void ESP32S3RAC50Board::boardInit(board_cfg_t init_cfg)
   mcpwm_init(MOTW_PWM_UNIT, MOTW_PWM_TIMER, &pwm_config);
 
   mcpwm_gpio_init(MOTW2_PWM_UNIT, MCPWM0A, MOTW2_IN1_PIN);
-  mcpwm_gpio_init(MOTW2_PWM_UNIT, MCPWM0A, MOTW2_IN2_PIN);
+  mcpwm_gpio_init(MOTW2_PWM_UNIT, MCPWM0B, MOTW2_IN2_PIN);
   mcpwm_init(MOTW2_PWM_UNIT, MOTW2_PWM_TIMER, &pwm_config);
 
   pinMode(SERVOA_PIN, OUTPUT);
@@ -80,19 +86,19 @@ void ESP32S3RAC50Board::boardInit(board_cfg_t init_cfg)
   ledcAttachPin(SERVOA_PIN, SERVOA_LEDCCH);
 }
 
-void ESP32S3RAC50Board::motRSetSpeed(int speed)
+void ESP32S3RACBoard::motRSetSpeed(int speed)
 {
   setMotorSpeed(MOTR_PWM_UNIT, MOTR_PWM_TIMER, speed);
   return;
 }
 
-void ESP32S3RAC50Board::motLSetSpeed(int speed)
+void ESP32S3RACBoard::motLSetSpeed(int speed)
 {
   setMotorSpeed(MOTL_PWM_UNIT, MOTL_PWM_TIMER, speed);
   return;
 }
 
-void ESP32S3RAC50Board::motWSetSpeed(int speed)
+void ESP32S3RACBoard::motWSetSpeed(int speed)
 {
   if (board_cfg.dc_servo)
   {
@@ -102,7 +108,7 @@ void ESP32S3RAC50Board::motWSetSpeed(int speed)
   return;
 }
 
-void ESP32S3RAC50Board::motWSeekPot(int angle, int dc_dir)
+void ESP32S3RACBoard::motWSeekPot(int angle, int dc_dir)
 {
   if (!board_cfg.dc_servo || angle < 0)
   {
@@ -158,23 +164,24 @@ void ESP32S3RAC50Board::motWSeekPot(int angle, int dc_dir)
   //*/
 }
 
-void ESP32S3RAC50Board::motW2SetSpeed(int speed)
+void ESP32S3RACBoard::motW2SetSpeed(int speed)
 {
+  //Serial.println(speed);
   setMotorSpeed(MOTW2_PWM_UNIT, MOTW2_PWM_TIMER, speed);
   return;
 }
 
-void ESP32S3RAC50Board::servoASetAngle(int angle)
+void ESP32S3RACBoard::servoASetAngle(int angle)
 {
   setServoAngle(SERVOA_LEDCCH, angle);
 }
 
-void ESP32S3RAC50Board::servoBSetAngle(int angle)
+void ESP32S3RACBoard::servoBSetAngle(int angle)
 {
   return;
 }
 
-void ESP32S3RAC50Board::failsafe()
+void ESP32S3RACBoard::failsafe()
 {
   ledcWrite(SERVOA_LEDCCH, 0);
   motRSetSpeed(0);
@@ -184,7 +191,7 @@ void ESP32S3RAC50Board::failsafe()
   return;
 }
 
-void ESP32S3RAC50Board::setLed(bool state)
+void ESP32S3RACBoard::setLed(bool state)
 {
   if (!state)
   {

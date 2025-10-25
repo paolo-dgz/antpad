@@ -109,7 +109,7 @@ void C3superminiCoreBoard::motWSetSpeed(int speed)
   return;
 }
 
-void C3superminiCoreBoard::motWSeekPot(int angle)
+void C3superminiCoreBoard::motWSeekPot(int angle, int dc_dir)
 {
   return;
 }

@@ -1,44 +1,17 @@
-#define ARDUINO_ESP32S3_DEV
-
 #ifdef ARDUINO_ESP32S3_DEV
 
-#ifndef ESP32S3_RAC50_H
-#define ESP32S3_RAC50_H
+#ifndef ESP32S3_RAC_H
+#define ESP32S3_RAC_H
 
-// to use with any c3 supermini and drv8833 board
+// to use with RAC core boards
 #include "../Board.h"
 #include <driver/ledc.h>
 #include <driver/mcpwm.h>
 #include <Arduino.h>
+#include "RACPinouts.h"
 
-#define POT_PIN 11 // adc ADC1_CH3
 
-#define SERVOA_PIN 14
-#define SERVOA_LEDCCH 0
-
-#define LED_PIN 21
-
-#define MOTR_IN1_PIN 16
-#define MOTR_IN2_PIN 17
-#define MOTR_PWM_UNIT MCPWM_UNIT_0
-#define MOTR_PWM_TIMER MCPWM_TIMER_0
-
-#define MOTL_IN1_PIN 8
-#define MOTL_IN2_PIN 18
-#define MOTL_PWM_UNIT MCPWM_UNIT_0
-#define MOTL_PWM_TIMER MCPWM_TIMER_1
-
-#define MOTW_IN1_PIN 4
-#define MOTW_IN2_PIN 5
-#define MOTW_PWM_UNIT MCPWM_UNIT_0
-#define MOTW_PWM_TIMER MCPWM_TIMER_2
-
-#define MOTW2_IN1_PIN 6
-#define MOTW2_IN2_PIN 15
-#define MOTW2_PWM_UNIT MCPWM_UNIT_1
-#define MOTW2_PWM_TIMER MCPWM_TIMER_0
-
-class ESP32S3RAC50Board : public Board
+class ESP32S3RACBoard : public Board
 {
 public:
   void boardInit(board_cfg_t init_cfg);

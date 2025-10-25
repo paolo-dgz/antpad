@@ -34,7 +34,7 @@ public:
   void motRSetSpeed(int speed);
   void motLSetSpeed(int speed);
   void motWSetSpeed(int speed);
-  void motWSeekPot(int angle);
+  void motWSeekPot(int angle, int dc_dir = 1);
   void servoASetAngle(int angle);
   void servoBSetAngle(int angle);
   void failsafe();
