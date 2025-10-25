@@ -4,9 +4,9 @@
 #include "src/ledUtility/ledUtility.h"
 #include "eeprom_utils.h"
 
-//#define C3SUPERMINI_CORE
+#define C3SUPERMINI_CORE
 //#define C3SUPERMINI_DRV8833
-#define ESP32S3_RAC //please navigate to src/ESP32S3RACBoard/RACPinouts.h to chose board version, default is 5.0
+//#define ESP32S3_RAC //please navigate to src/ESP32S3RACBoard/RACPinouts.h to chose board version, default is 5.0
 //#define CUSTOM_BOARD
 
 /*
