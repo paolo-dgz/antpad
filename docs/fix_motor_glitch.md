@@ -17,8 +17,7 @@ use and arduino ide or device manager to get your COM port, copy and overwrite C
 run the following command to check the current state of the fuse (should be false)
 
 ```
-espefuse.py --port COM4 summary | FINDSTR DIS_USB_SERIAL_
-
+espefuse.py --port COM4 summary | FINDSTR DIS_PAD_JTAG
 ```
 
 run the following command to disable the PAD debug function
