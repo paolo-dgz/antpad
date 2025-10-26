@@ -1,10 +1,10 @@
-Guide to navigate v0.2 settings menu directly from the remote
+# Guide to navigate v0.2 settings menu directly from the remote
 
-to enter the menu turn on the robot without turining on the controller, once the builtin led will start blinking fater turn on the controller
+to enter the menu turn on the robot without turining on the controller, once the builtin led will start blinking fater turn on the controller 
 
-when the controller is connected the led will start blinking a number of time corresponding to the current setting,
+when the controller is connected the led will start blinking a number of time corresponding to the current setting
 
-*navigation* commands: 
+## *navigation* commands: 
 in navigation menu the board will failsafe and no controller input will be relied to the board
 - up: move to next setting
 - down: move to previous setting
@@ -19,10 +19,7 @@ settings list, the number corresponds to the number of blinks
 5) blank, will be used in the future
 6) factory reset
 
-
-
-
-1) servo commands: 
+## 1) servo commands: 
 while in servo mode the current editing EPA for the current editing servo will be sent in place of the controller input, swap to the other servo to allow controller input and check inveret/normal direction 
 all motor inputs will be live when in servo setting
 
@@ -36,7 +33,7 @@ all motor inputs will be live when in servo setting
 - B: restart robot (does not save)
 - A: save and go back to *navigation*
 
-2) motors commands:
+## 2) motors commands:
 - up: invert/normalize motor C/W
 - left: invert/normalize motor L
 - right: invert/normalize motor R
@@ -45,7 +42,7 @@ all motor inputs will be live when in servo setting
 - B: restart robot (does not save)
 - A: save and go back to *navigation*
 
-3) remote commands:
+## 3) remote commands:
 
 - right: invert/normalize ch 1 (steering)
 - down: invert/normalize ch 2 (throttle)
@@ -63,7 +60,7 @@ all motor inputs will be live when in servo setting
 - B: restart robot (does not save)
 - A: save and go back to *navigation*
 
-4) board
+## 4) board
 - up: enable dc servo mode
     when on dc servo mode a pot must be connected to servo b pin or dedicated pot pin
     servo a pin will output servo b pwm
@@ -78,12 +75,12 @@ all motor inputs will be live when in servo setting
 - B: restart robot (does not save)
 - A: save and restart robot
 
-5) to be implemented
+## 5) to be implemented
 
 - B: go back to *navigation*
 - A: go back to *navigation*
 
-6) factory reset
+## 6) factory reset
 
 - B: go to *navigation* (does not restart)
 - A: clean EEPROM and restart robot
