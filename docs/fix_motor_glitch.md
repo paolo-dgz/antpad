@@ -17,14 +17,14 @@ use and arduino ide or device manager to get your COM port, copy and overwrite C
 run the following command to check the current state of the fuse (should be false)
 
 ```
-espefuse.py --port COM4 summary | FINDSTR DIS\_USB\_SERIAL\_
+espefuse.py --port COM4 summary | FINDSTR DIS_USB_SERIAL_
 
 ```
 
 run the following command to disable the PAD debug function
 
 ```
-espefuse.py --port COM4 burn\_efuse DIS\_PAD\_JTAG 1
+espefuse.py --port COM4 burn_efuse DIS_PAD_JTAG 1
 ```
 
 note: the command will ask to type BURN to confirm the operation, burning fuses is an irreversible action
