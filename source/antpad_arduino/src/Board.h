@@ -23,8 +23,8 @@ public:
 
 protected:
   board_cfg_t board_cfg;
-  int servo_min_duty = 820;
-  int servo_max_duty = 1638;
+  int servo_min_duty = 820; //410
+  int servo_max_duty = 1638; //2048
 };
 
 #endif

@@ -35,6 +35,7 @@ void C3superminiDRV8833Board::setServoAngle(char servo_ledcch, int angle)
 void C3superminiDRV8833Board::boardInit(board_cfg_t init_cfg)
 {
   Serial.println("DRV8833 init");
+  board_cfg = init_cfg;
 
   pinMode(MOTR_IN1_PIN, OUTPUT);
   pinMode(MOTR_IN2_PIN, OUTPUT);

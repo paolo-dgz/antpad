@@ -43,6 +43,12 @@ public:
 private:
   void setMotorSpeed(char en_ledc_ch, char ph_pin, int speed);
   void setServoAngle(char servo_ledcch, int angle);
+  float pid_prop_k = 4;
+  float pid_deriv_k = 15.0;
+  float pid_integ_k = 0.3;
+  float prev_error = 0.0;
+  float pid_integral = 0.0;
+  unsigned long pid_prev_time = 0;
 };
 
 #endif

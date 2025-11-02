@@ -177,7 +177,7 @@ void processController() {
   ch_vals[3] = constrain(-RemoteController->axisY() * RemoteConfig.ch3_dir, -508, 508);
   ch_vals[4] = constrain(RemoteController->axisX() * RemoteConfig.ch4_dir, -508, 508);
   ch_vals[5] = 508 * RemoteController->l1() - 508 * RemoteController->r1();
-  ch_vals[6] = RemoteController->throttle() - RemoteController->brake();
+  ch_vals[6] = -RemoteController->throttle() + RemoteController->brake();
 
   if (RemoteConfig.swap_sticks) {
     ch_vals[3] = constrain(-RemoteController->axisRY() * RemoteConfig.ch1_dir, -508, 508);
@@ -209,6 +209,9 @@ void processController() {
   if (ch_vals[5] != 0) {
     ch_vals[3] = ch_vals[5];
   }
+  if (ch_vals[6] != 0) {
+    ch_vals[3] = ch_vals[6]/4;
+  }
 
   if (!RemoteConfig.ch3_centered) {
     int temp_ch3 = ch_vals[3];
@@ -225,7 +228,7 @@ void processController() {
   int motorRVal = ChannelMap.motor_r != 0 ? ch_vals[ChannelMap.motor_r] : 0;
   int motorLVal = ChannelMap.motor_l != 0 ? ch_vals[ChannelMap.motor_l] : 0;
   int motorWVal = ChannelMap.motor_w != 0 ? ch_vals[ChannelMap.motor_w] : 0;
-
+  //Serial.printf("ch1 %d ch2 %d ch3 %d ch4 %d ch5 %d ch6 %d \n",ch_vals[1],ch_vals[2],ch_vals[3],ch_vals[4],ch_vals[5],ch_vals[6]);
 
 
 
@@ -320,19 +323,20 @@ void processBoard() {
   }
 }
 
-
 void check_mode() {
   unsigned long current_time = millis();
   if (!connection_ok) {
     if (current_time > 60000 + BootMs && binding == false) {
       Serial.println("ENTERED BINDING");
+      
       MenuStateCurrent = MENU_NONE;
       MacEepromValid = false;
       binding = true;
       return;
     }
     if (current_time > 6000 + BootMs && MenuStateCurrent == MENU_NONE && current_time < 59000) {
-      Serial.println("ENTERED SETTINGS");
+      Serial.print("ENTERED SETTINGS at ");
+      Serial.println(current_time);
       MenuStateCurrent = MENU_LIST;
       return;
     }
@@ -363,11 +367,13 @@ void handle_blink() {
           LedTask.setBlinks(1, 250, 4);
         }
         break;
+      default:
+        LedTask.setBlinks(MenuListItem, 250, 4);
     }
     return;
   }
   if (failsafe) {
-    LedTask.setBlinks(1, -1, 0.5);
+    LedTask.setBlinks(1, -1, 1);
     return;
   }
   LedTask.ledOn();
@@ -595,15 +601,23 @@ void processMenuState(MenuCmd cmd) {
       switch (cmd) {
         case CMD_DOWN:
           BoardConfig.dc_servo = false;
+          Serial.print("DC Servo Disabled: ");
+          Serial.println(BoardConfig.dc_servo);
           break;
         case CMD_UP:
           BoardConfig.dc_servo = true;
+          Serial.print("DC Servo Enabled: ");
+          Serial.println(BoardConfig.dc_servo);
           break;
         case CMD_LEFT:
           BoardConfig.servo_stretcher = false;
+          Serial.print("Servo Stretcher Disabled: ");
+          Serial.println(BoardConfig.servo_stretcher);
           break;
         case CMD_RIGHT:
           BoardConfig.servo_stretcher = true;
+          Serial.print("Servo Stretcher Enabled: ");
+          Serial.println(BoardConfig.servo_stretcher);
           break;
       }
       break;
@@ -707,13 +721,6 @@ void processMenuState(MenuCmd cmd) {
 // Arduino setup function. Runs in CPU 1
 void setup() {
   Serial.begin(115200);
-  Serial.printf("Firmware: %s\n", BP32.firmwareVersion());
-  Serial.printf("Antpad: %s\n", AntpadVersion);
-  const uint8_t* addr = BP32.localBdAddress();
-  Serial.printf("BD Addr: %2X:%2X:%2X:%2X:%2X:%2X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
-
-
-  LedTask.init();
   InitEeprom();
   if (MacEepromValid) {
     binding = false;
@@ -726,26 +733,23 @@ void setup() {
     CmdStates[cmd_i] = false;
     CmdStatesPrev[cmd_i] = false;
   }
+  LedTask.init();
+  LedTask.ledOn();
 
+  Serial.printf("Firmware: %s\n", BP32.firmwareVersion());
+  Serial.printf("Antpad: %s\n", AntpadVersion);
+  const uint8_t* addr = BP32.localBdAddress();
+  Serial.printf("BD Addr: %2X:%2X:%2X:%2X:%2X:%2X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
   // Setup the Bluepad32 callbacks
   BP32.setup(&onConnectedController, &onDisconnectedController);
-
-  // "forgetBluetoothKeys()" should be called when the user performs
-  // a "device factory reset", or similar.
-  // Calling "forgetBluetoothKeys" in setup() just as an example.
-  // Forgetting Bluetooth keys prevents "paired" gamepads to reconnect.
-  // But it might also fix some connection / re-connection issues.
   BP32.forgetBluetoothKeys();
-
-  // Enables mouse / touchpad support for gamepads that support them.
-  // When enabled, controllers like DualSense and DualShock4 generate two connected devices:
-  // - First one: the gamepad
-  // - Second one, which is a "virtual device", is a mouse.
-  // By default, it is disabled.
   BP32.enableVirtualDevice(false);
+
   analogReadResolution(10);
   analogSetAttenuation(ADC_11db);
   BootMs = millis();
+  Serial.print("boot ms:");
+  Serial.println(BootMs);
 }
 
 // Arduino loop function. Runs in CPU 1.

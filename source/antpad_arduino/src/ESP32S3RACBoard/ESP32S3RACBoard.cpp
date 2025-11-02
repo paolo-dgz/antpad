@@ -36,6 +36,10 @@ void ESP32S3RACBoard::setMotorSpeed(mcpwm_unit_t unit, mcpwm_timer_t timer, int 
 
 void ESP32S3RACBoard::setServoAngle(char servo_ledcch, int angle)
 {
+  if(angle < 0 ){
+    ledcWrite(servo_ledcch, 0);
+    return;
+  }
   angle = constrain(angle, 0, 1023);
   int duty = map(angle, 0, 1023, servo_min_duty, servo_max_duty);
   ledcWrite(servo_ledcch, duty);
@@ -110,14 +114,20 @@ void ESP32S3RACBoard::motWSetSpeed(int speed)
 
 void ESP32S3RACBoard::motWSeekPot(int angle, int dc_dir)
 {
-  if (!board_cfg.dc_servo || angle < 0)
+
+  if (!board_cfg.dc_servo)
+  {
+    return;
+  }
+
+  if (angle < 0)
   {
     setMotorSpeed(MOTW_PWM_UNIT, MOTW_PWM_TIMER, 0);
     return;
   }
   angle = constrain(angle, 0, 1023);
   int current_pos = analogRead(POT_PIN);
-  //Serial.println(current_pos);
+  // Serial.println(current_pos);
   unsigned long pid_time = millis();
   float pid_error = angle - current_pos;
   float pid_prop = pid_error * pid_prop_k;
@@ -142,7 +152,7 @@ void ESP32S3RACBoard::motWSeekPot(int angle, int dc_dir)
     pid_deriv = 0;
   }
   int wpn_pwm = pid_prop + pid_deriv + pid_integral;
-  setMotorSpeed(MOTW_PWM_UNIT, MOTW_PWM_TIMER, wpn_pwm*dc_dir);
+  setMotorSpeed(MOTW_PWM_UNIT, MOTW_PWM_TIMER, wpn_pwm * dc_dir);
 
   // prev sets for next iteration
   prev_error = pid_error;
@@ -166,7 +176,7 @@ void ESP32S3RACBoard::motWSeekPot(int angle, int dc_dir)
 
 void ESP32S3RACBoard::motW2SetSpeed(int speed)
 {
-  //Serial.println(speed);
+  // Serial.println(speed);
   setMotorSpeed(MOTW2_PWM_UNIT, MOTW2_PWM_TIMER, speed);
   return;
 }
@@ -183,11 +193,14 @@ void ESP32S3RACBoard::servoBSetAngle(int angle)
 
 void ESP32S3RACBoard::failsafe()
 {
-  ledcWrite(SERVOA_LEDCCH, 0);
+  servoASetAngle(-1);
+  motWSeekPot(-1);
+
   motRSetSpeed(0);
   motLSetSpeed(0);
   motWSetSpeed(0);
   motW2SetSpeed(0);
+
   return;
 }
 
