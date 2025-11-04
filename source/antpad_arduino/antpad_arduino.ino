@@ -357,7 +357,7 @@ void handle_blink() {
         if (MenuListItem > 0) {
           LedTask.setBlinks(MenuListItem, 500, 2);
         } else {
-          LedTask.setBlinks(1, -1, 15);
+          LedTask.setBlinks(1, -1, 7);
         }
         break;
       case MENU_SERVOS:
