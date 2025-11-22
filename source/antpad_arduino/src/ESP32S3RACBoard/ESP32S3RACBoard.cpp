@@ -48,7 +48,7 @@ void ESP32S3RACBoard::setServoAngle(char servo_ledcch, int angle)
 // public
 void ESP32S3RACBoard::boardInit(board_cfg_t init_cfg)
 {
-  Serial.println("DRV8833 init");
+  Serial.println("RACS3 init");
   board_cfg = init_cfg;
 
   pinMode(MOTR_IN1_PIN, OUTPUT);
@@ -127,7 +127,7 @@ void ESP32S3RACBoard::motWSeekPot(int angle, int dc_dir)
   }
   angle = constrain(angle, 0, 1023);
   int current_pos = analogRead(POT_PIN);
-  // Serial.println(current_pos);
+  //Serial.println(current_pos);
   unsigned long pid_time = millis();
   float pid_error = angle - current_pos;
   float pid_prop = pid_error * pid_prop_k;

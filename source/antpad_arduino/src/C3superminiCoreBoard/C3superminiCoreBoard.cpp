@@ -44,8 +44,8 @@ void C3superminiCoreBoard::boardInit(board_cfg_t init_cfg)
 {
   Serial.println("CORE init");
   board_cfg = init_cfg;
-  Serial.println(board_cfg.dc_servo);
-  Serial.println(board_cfg.servo_stretcher);
+  //Serial.println(board_cfg.dc_servo);
+  //Serial.println(board_cfg.servo_stretcher);
   gpio_reset_pin(GPIO_NUM_4);
   gpio_reset_pin(GPIO_NUM_5);
 

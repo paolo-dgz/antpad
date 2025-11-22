@@ -1,6 +1,7 @@
 #define RAC41
 #include <Bluepad32.h>
 #include <EEPROM.h>
+#include <uni.h>   // for the allowlist APIs
 #include "src/ledUtility/ledUtility.h"
 #include "eeprom_utils.h"
 
@@ -42,7 +43,7 @@ LedUtility LedTask = LedUtility(&RobotBoard);
 
 //global vars
 
-String AntpadVersion = "0.1.1";
+String AntpadVersion = "0.1.2";
 ControllerPtr RemoteController;
 unsigned long CurrentMs = 0;
 unsigned long BootMs = 0;
@@ -130,6 +131,9 @@ void onConnectedController(ControllerPtr ctl) {
   failsafe = false;
   connection_ok = true;
   BP32.enableNewBluetoothConnections(false);
+  uni_bt_allowlist_add_addr(ControllerAddress);
+  uni_bt_allowlist_set_enabled(true);
+  Serial.println("uni BT locked");
   Serial.println("VALID => LOCKED");
 }
 
@@ -206,12 +210,14 @@ void processController() {
     ch_vals[6] = 0;
   }
 
-  if (ch_vals[5] != 0) {
-    ch_vals[3] = ch_vals[5];
-  }
   if (ch_vals[6] != 0) {
     ch_vals[3] = ch_vals[6]/4;
   }
+
+  if (ch_vals[5] != 0) {
+    ch_vals[3] = ch_vals[5];
+  }
+  
 
   if (!RemoteConfig.ch3_centered) {
     int temp_ch3 = ch_vals[3];
@@ -328,7 +334,8 @@ void check_mode() {
   if (!connection_ok) {
     if (current_time > 60000 + BootMs && binding == false) {
       Serial.println("ENTERED BINDING");
-      
+      uni_bt_allowlist_remove_all();
+      uni_bt_allowlist_set_enabled(false);
       MenuStateCurrent = MENU_NONE;
       MacEepromValid = false;
       binding = true;
@@ -468,7 +475,7 @@ void processMenuState(MenuCmd cmd) {
         case CMD_LEFT:
           if (MenuCurrentServoEPA) {
             temp_angle = RemoteConfig.servo_mins[MenuCurrentServo];
-            temp_angle = temp_angle - 10;
+            temp_angle = temp_angle + 10;
             temp_angle = constrain(temp_angle, 0, RemoteConfig.servo_maxs[MenuCurrentServo] - 20);
             RemoteConfig.servo_mins[MenuCurrentServo] = temp_angle;
           } else {
@@ -487,7 +494,7 @@ void processMenuState(MenuCmd cmd) {
         case CMD_RIGHT:
           if (MenuCurrentServoEPA) {
             temp_angle = RemoteConfig.servo_mins[MenuCurrentServo];
-            temp_angle = temp_angle + 10;
+            temp_angle = temp_angle - 10;
             temp_angle = constrain(temp_angle, 0, RemoteConfig.servo_maxs[MenuCurrentServo] - 20);
             RemoteConfig.servo_mins[MenuCurrentServo] = temp_angle;
           } else {
@@ -724,7 +731,11 @@ void setup() {
   InitEeprom();
   if (MacEepromValid) {
     binding = false;
+    uni_bt_allowlist_add_addr(ControllerAddress);
+    uni_bt_allowlist_set_enabled(true);
+    Serial.println("uni BT locked");
   }
+
   Board::board_cfg_t init_cfg;
   init_cfg.dc_servo = BoardConfig.dc_servo;
   init_cfg.servo_stretcher = BoardConfig.servo_stretcher;
@@ -739,7 +750,7 @@ void setup() {
   Serial.printf("Firmware: %s\n", BP32.firmwareVersion());
   Serial.printf("Antpad: %s\n", AntpadVersion);
   const uint8_t* addr = BP32.localBdAddress();
-  Serial.printf("BD Addr: %2X:%2X:%2X:%2X:%2X:%2X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+  Serial.printf("Bluepad Self Addr: %2X:%2X:%2X:%2X:%2X:%2X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
   // Setup the Bluepad32 callbacks
   BP32.setup(&onConnectedController, &onDisconnectedController);
   BP32.forgetBluetoothKeys();
