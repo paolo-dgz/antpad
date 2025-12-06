@@ -79,7 +79,7 @@ void C3superminiDRV8833Board::motWSetSpeed(int speed)
   return;
 }
 
-void C3superminiDRV8833Board::motWSeekPot(int angle)
+void C3superminiDRV8833Board::motWSeekPot(int angle, int dc_dir)
 {
   return;
 }
