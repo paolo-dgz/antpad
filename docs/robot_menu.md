@@ -8,18 +8,21 @@ when the controller is connected the led will start blinking a number of time co
 robot on 6 seconds before the remote
 └── navigation
     ├── 1) servo
-    │   └──  B restart without saving
+    │   └── B restart without saving
+    │   └── A Save and go back
     ├── 2) motors
     │   └── B restart without saving
+    │   └── A Save and go back
     ├── 3) remote
     │   └── B restart without saving
+    │   └── A Save and go back
     ├── 4) board
-    │   ├── A save and restart
-    │   └── B restart
+    │   ├── B restart without saving
+    │   └── A save and restart
     ├── 5) blank, will be used in the future
     └── 6) factory reset
-        ├── A clear eeprom and restart
-        └── B restart
+        ├── B restart
+        └── A clear eeprom and restart
 ```
 
 ## navigation commands: 
@@ -38,7 +41,7 @@ all motor inputs will be live when in servo setting
 - left: lower current endpoint
 - right: increase current endpoint
 - Y: invert/normalize current servo
-- X: swap current edited servo
+- X: change editing endpoint
 
 - B: restart robot (does not save)
 - A: save and go back to **navigation**
