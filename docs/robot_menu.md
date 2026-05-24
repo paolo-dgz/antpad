@@ -1,4 +1,4 @@
-# Guide to navigate v0.2 settings menu directly from the remote
+# Guide to navigate v0.1.2 settings menu directly from the remote
 
 to enter the menu turn on the robot without turining on the controller, once the builtin led will start blinking faster turn on the controller 
 
