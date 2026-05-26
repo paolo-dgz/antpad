@@ -51,7 +51,7 @@ int ch_vals[7] = { 0, 0, 0, 0, 0, 0, 0 };
 
 bool binding = true;
 bool failsafe = true;
-bool connection_ok = false;
+bool controller_ever_connected = false;
 
 int motRSpeed = 0;
 int motLSpeed = 0;
@@ -70,6 +70,8 @@ enum MenuCmd { CMD_UP,
                CMD_Y,
                CMD_A,
                CMD_B,
+               CMD_R,
+               CMD_L,
                CMD_AMOUNT,
                CMD_NONE };
 bool CmdStates[CMD_AMOUNT];
@@ -104,8 +106,6 @@ uint8_t MenuCurrentServo = 0;
 uint8_t MenuCurrentServoEPA = 0;
 
 
-
-
 // This callback gets called any time a new gamepad is connected.
 // Up to 4 gamepads can be connected at the same time.
 void onConnectedController(ControllerPtr ctl) {
@@ -129,7 +129,7 @@ void onConnectedController(ControllerPtr ctl) {
   }
   RemoteController = ctl;
   failsafe = false;
-  connection_ok = true;
+  controller_ever_connected = true;
   BP32.enableNewBluetoothConnections(false);
   uni_bt_allowlist_add_addr(ControllerAddress);
   uni_bt_allowlist_set_enabled(true);
@@ -331,7 +331,7 @@ void processBoard() {
 
 void check_mode() {
   unsigned long current_time = millis();
-  if (!connection_ok) {
+  if (!controller_ever_connected) {
     if (current_time > 60000 + BootMs && binding == false) {
       Serial.println("ENTERED BINDING");
       uni_bt_allowlist_remove_all();
@@ -341,7 +341,7 @@ void check_mode() {
       binding = true;
       return;
     }
-    if (current_time > 6000 + BootMs && MenuStateCurrent == MENU_NONE && current_time < 59000) {
+    if (current_time > 6000 + BootMs && MenuStateCurrent == MENU_NONE && current_time < 59000 && binding == false) {
       Serial.print("ENTERED SETTINGS at ");
       Serial.println(current_time);
       MenuStateCurrent = MENU_LIST;
@@ -351,7 +351,6 @@ void check_mode() {
     binding = false;
   }
 }
-
 
 void handle_blink() {
   if (binding) {
@@ -369,7 +368,7 @@ void handle_blink() {
         break;
       case MENU_SERVOS:
         if (MenuCurrentServo) {
-          LedTask.setBlinks(2, 250, 4);
+          LedTask.setBlinks(1, 250, 8);
         } else {
           LedTask.setBlinks(1, 250, 4);
         }
@@ -396,6 +395,8 @@ MenuCmd getControllerCmd() {
   CmdStates[CMD_B] = RemoteController->b();
   CmdStates[CMD_Y] = RemoteController->y();
   CmdStates[CMD_X] = RemoteController->x();
+  CmdStates[CMD_R] = RemoteController->r1();
+  CmdStates[CMD_L] = RemoteController->l1();
 
   if (CmdLocked == CMD_NONE) {
     for (uint8_t cmd_i; cmd_i < CMD_AMOUNT; cmd_i++) {
@@ -443,7 +444,7 @@ void processMenuState(MenuCmd cmd) {
       break;
     case MENU_LIST:
       disable_movements = true;
-      if (connection_ok && MenuListItem == MENU_LIST) {
+      if (controller_ever_connected && MenuListItem == MENU_LIST) {
         MenuListItem = MENU_SERVOS;
       }
       switch (cmd) {
@@ -723,7 +724,6 @@ void processMenuState(MenuCmd cmd) {
   MenuStateCurrent = MenuStateNext;
   CmdTriggered = CMD_NONE;
 }
-
 
 // Arduino setup function. Runs in CPU 1
 void setup() {
