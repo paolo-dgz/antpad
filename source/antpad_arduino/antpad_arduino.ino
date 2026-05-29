@@ -5,8 +5,10 @@
 #include "src/ledUtility/ledUtility.h"
 #include "eeprom_utils.h"
 
-#define C3SUPERMINI_CORE
-//#define C3SUPERMINI_DRV8833
+//uncomment the following line depening on your hardware, if custom use files in /src/CustomBoard to implement your layout but keep menu, failsafe and mixing behaviour
+
+#define C3SUPERMINI_CORE //for asd i robottari shield
+//#define C3SUPERMINI_DRV8833 //please navigate to /src/C3superminiDrv8833Board/C3superminiDrv8833Board.h to know drv8833 and servo pins layout
 //#define ESP32S3_RAC //please navigate to src/ESP32S3RACBoard/RACPinouts.h to chose board version, default is 5.0
 //#define CUSTOM_BOARD
 
