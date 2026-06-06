@@ -9,11 +9,11 @@
 
 #define LED_PIN 8
 
-#define SERVOA_PIN 4 // pwm
+#define SERVOA_PIN 10 // pwm
 
-#define MOTR_PIN 0
+#define MOTR_PIN 1
 
-#define MOTL_PIN 0
+#define MOTL_PIN 3
 
 #define MOTR_LEDCCH 0 // pwm
 #define MOTL_LEDCCH 1 // pwm
@@ -33,9 +33,9 @@ public:
 
   //add your private functions and vars here
 private:
-  int motor_center_duty = servo_min_duty + (servo_max_duty-servo_min_duty)/2;
-  int motor_min_duty = servo_min_duty;
-  int motor_max_duty = servo_max_duty;
+  int motor_min_duty = 820;
+  int motor_max_duty = 1638;
+  int motor_center_duty = 1229;
   void setMotorSpeed(char motor_ledcc, int speed);
   void setServoAngle(char servo_ledcch, int angle);
 

@@ -16,7 +16,7 @@ void C3DescBoard::setMotorSpeed(char motor_ledcch, int speed)
   }
   if (speed > 0)
   {
-    int duty = map(speed, 0, 512, motor_min_duty, motor_center_duty);
+    int duty = map(speed, 0, 512,motor_center_duty, motor_min_duty);
     ledcWrite(motor_ledcch, duty);
     return;
   }

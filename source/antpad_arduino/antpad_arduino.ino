@@ -1,7 +1,7 @@
 #define RAC41
 #include <Bluepad32.h>
 #include <EEPROM.h>
-#include <uni.h>   // for the allowlist APIs
+#include <uni.h>  // for the allowlist APIs
 #include "src/ledUtility/ledUtility.h"
 #include "eeprom_utils.h"
 
@@ -219,13 +219,13 @@ void processController() {
   }
 
   if (ch_vals[6] != 0) {
-    ch_vals[3] = ch_vals[6]/4;
+    ch_vals[3] = ch_vals[6] / 4;
   }
 
   if (ch_vals[5] != 0) {
     ch_vals[3] = ch_vals[5];
   }
-  
+
 
   if (!RemoteConfig.ch3_centered) {
     int temp_ch3 = ch_vals[3];
@@ -271,6 +271,12 @@ void processController() {
     motRSpeed = leftMixedSpeed;
   }
 
+#ifdef C33_DESC
+  motRSpeed = map(steeringVal, -508, 508, -512, 512);
+  motRSpeed = constrain(motRSpeed, -512, 512);
+  motLSpeed = map(acceleratorVal, -508, 508, -512, 512);
+  motLSpeed = constrain(motLSpeed, -512, 512);
+#endif
 
   //weaps
   int temp_min = RemoteConfig.servo_mins[0];
@@ -299,15 +305,15 @@ void processController() {
 }
 
 void processBoard() {
-  /*
+  ///*
   Serial.print("  R:\t");
   Serial.print(motRSpeed);
   Serial.print("  L:\t");
   Serial.print(motLSpeed);
   Serial.print("  W:\t");
   Serial.print(motWSpeed);
-  Serial.print("  W2:\t");
-  Serial.print(motW2Speed);
+  //Serial.print("  W2:\t");
+ // Serial.print(motW2Speed);
   Serial.print("  A:\t");
   Serial.print(servo0Angle);
   Serial.print("  B:\t");
@@ -325,7 +331,7 @@ void processBoard() {
 
   RobotBoard.motLSetSpeed(motLSpeed * RemoteConfig.motl_dir);
   RobotBoard.motRSetSpeed(motRSpeed * RemoteConfig.motr_dir);
-  
+
 
   if (BoardConfig.dc_servo) {
     RobotBoard.motWSeekPot(servo0Angle, RemoteConfig.motw_dir);
