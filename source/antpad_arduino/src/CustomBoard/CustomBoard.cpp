@@ -29,7 +29,7 @@ void CustomBoard::motWSetSpeed(int speed)
   return;
 }
 
-void CustomBoard::motWSeekPot(int angle)
+void CustomBoard::motWSeekPot(int angle, int dc_dir)
 {
   // move your weapon motor so that it makes the potentometer
   // reach the target readings

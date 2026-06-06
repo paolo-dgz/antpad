@@ -7,9 +7,10 @@
 
 //uncomment the following line depening on your hardware, if custom use files in /src/CustomBoard to implement your layout but keep menu, failsafe and mixing behaviour
 
-#define C3SUPERMINI_CORE //for asd i robottari shield
+//#define C3SUPERMINI_CORE //for asd i robottari shield
 //#define C3SUPERMINI_DRV8833 //please navigate to /src/C3superminiDrv8833Board/C3superminiDrv8833Board.h to know drv8833 and servo pins layout
 //#define ESP32S3_RAC //please navigate to src/ESP32S3RACBoard/RACPinouts.h to chose board version, default is 5.0
+#define C3_DESC
 //#define CUSTOM_BOARD
 
 /*
@@ -32,6 +33,11 @@ C3superminiDRV8833Board RobotBoard;
 #ifdef ESP32S3_RAC
 #include "src/ESP32S3RACBoard/ESP32S3RACBoard.h"
 ESP32S3RACBoard RobotBoard;
+#endif
+
+#ifdef C3_DESC
+#include "src/C3DescBoard/C3DescBoard.h"
+C3DescBoard RobotBoard;
 #endif
 
 #ifdef CUSTOM_BOARD
